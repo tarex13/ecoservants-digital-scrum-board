@@ -13,10 +13,7 @@ const SubTasksItem = memo(({ index, checkedSubTasks, setCheckedSubTasks, item, s
     const [notesEditValue, setNotesEditValue] = useState(item?.notes);
     const [isEditing, setIsEditing] = useState(false);
     const [error, setError] = useState(null);
-    const [isSubmitting, setIsSubmitting] = useState(false);
     const checked = checkedSubTasks.includes(index);
-
-    // We toggle the checkbox by adding/removing it to/from checkedSubTasks
     const toggleCheckClick = () => {
         apiFetch({
             path: `/es-scrum/v1/subtasks/${item.id}`,

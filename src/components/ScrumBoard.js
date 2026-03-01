@@ -9,6 +9,7 @@ import BoardConfigModal from './BoardConfigModal';
 import SubTasksList from './SubTasksList';
 import UserProfileModal from './UserProfileModal';
 import { defaultConfig } from '../utils/defaultConfig';
+import SubTasksList from './SubtasksList';
 
 const COLUMNS = {
     backlog: { label: 'Backlog', color: '#ddd' },
@@ -33,6 +34,7 @@ const formatDate = (dateStr) => {
         year: 'numeric', month: 'short', day: 'numeric',
     });
 };
+
 
 const ScrumBoard = () => {
     const [tasks, setTasks] = useState([]);
