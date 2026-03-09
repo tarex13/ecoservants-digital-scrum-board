@@ -77,31 +77,48 @@ class EcoServants_Scrum_Board_API extends WP_REST_Controller
     public function get_items($request)
     {
         $db = es_scrum_db();
-        $table_name = es_scrum_table_name('tasks');
+
+        $tasks_table = es_scrum_table_name('tasks');
+        $labels_table = es_scrum_table_name('labels');
+        $join_table = es_scrum_table_name('task_labels');
 
         $page = $request->get_param('page') ? absint($request->get_param('page')) : 1;
         $per_page = $request->get_param('per_page') ? absint($request->get_param('per_page')) : 50;
         $offset = ($page - 1) * $per_page;
 
-        $program_slug = $request->get_param('program_slug'); // Optional filter
+        $program_slug = $request->get_param('program_slug');
 
         $where = "WHERE 1=1";
         $args = array();
 
         if (!empty($program_slug)) {
-            $where .= " AND program_slug = %s";
+            $where .= " AND t.program_slug = %s";
             $args[] = $program_slug;
         }
 
-        // Add sorting (default to created_at DESC)
-        $orderby = "ORDER BY created_at DESC";
+        $orderby = "ORDER BY t.created_at DESC";
 
-        // Add limits
         $limit = "LIMIT %d OFFSET %d";
         $args[] = $per_page;
         $args[] = $offset;
 
-        $sql = "SELECT * FROM {$table_name} {$where} {$orderby} {$limit}";
+        $sql = "
+            SELECT
+                t.*,
+                GROUP_CONCAT(
+                    CONCAT(l.id, ':', l.name, ':', l.color)
+                    SEPARATOR '|'
+                ) as labels
+            FROM {$tasks_table} t
+            LEFT JOIN {$join_table} tl
+                ON t.id = tl.task_id
+            LEFT JOIN {$labels_table} l
+                ON tl.label_id = l.id
+            {$where}
+            GROUP BY t.id
+            {$orderby}
+            {$limit}
+        ";
 
         if (!empty($args)) {
             $sql = $db->prepare($sql, $args);
@@ -109,13 +126,46 @@ class EcoServants_Scrum_Board_API extends WP_REST_Controller
 
         $tasks = $db->get_results($sql);
 
-        // Get total count
+        // Convert labels string into array
+        foreach ($tasks as &$task) {
+
+            if (!$task->labels) {
+                $task->labels = array();
+                continue;
+            }
+
+            $labels = explode('|', $task->labels);
+
+            $parsed = array();
+
+            foreach ($labels as $label) {
+
+                $parts = explode(':', $label);
+
+                if (count($parts) !== 3) {
+                    continue;
+                }
+
+                list($id, $name, $color) = $parts;
+
+                $parsed[] = array(
+                    'id' => (int) $id,
+                    'name' => $name,
+                    'color' => $color
+                );
+            }
+
+            $task->labels = $parsed;
+        }
+
+        // Get total count (without joins for speed)
         if (!empty($program_slug)) {
-            $count_query = "SELECT COUNT(*) FROM {$table_name} WHERE program_slug = %s";
+            $count_query = "SELECT COUNT(*) FROM {$tasks_table} WHERE program_slug = %s";
             $total = $db->get_var($db->prepare($count_query, $program_slug));
         } else {
-            $total = $db->get_var("SELECT COUNT(*) FROM {$table_name}");
+            $total = $db->get_var("SELECT COUNT(*) FROM {$tasks_table}");
         }
+
         $max_pages = ceil($total / $per_page);
 
         $response = new WP_REST_Response($tasks, 200);

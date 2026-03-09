@@ -32,7 +32,15 @@ const TaskCard = memo(({ task, onProfileClick, onViewDetails }) => {
     return (
         <Card style={{ marginBottom: '10px' }}>
             <CardHeader>
-                <strong>{task.title}</strong>
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    <strong>{task.title}</strong>
+                    <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap', paddingTop: '5px' }}>
+                        {task?.labels?.map(({ name, color }, index) => (
+                            <label key={index} style={{ padding: '4px 7px', border: '1px solid ' + color, color, boxShadow: '4px 3px 10px 0px rgba(0,0,0,0.05)', borderRadius: '15px', }}>{name}</label>
+
+                        ))}
+                    </div>
+                </div>
             </CardHeader>
             <CardBody>
                 {task.description}
@@ -74,18 +82,39 @@ const TaskCard = memo(({ task, onProfileClick, onViewDetails }) => {
                     </div>
                 )}
             </CardBody>
-        </Card>
+        </Card >
     );
 });
 
 // Memoized Column
-const BoardColumn = memo(({ col, config, onProfileClick, onViewDetails }) => {
+const BoardColumn = memo(({ col, config, onProfileClick, onViewDetails, taskLabels }) => {
+    const [labelFilters, setLabelFilters] = useState([]);
+    const toggleLabelFilter = (id) => {
+        setLabelFilters(state => state.includes(id) ? state.filter((el) => el != id) : [...state, id])
+    }
+    useEffect(() => console.log(labelFilters), [labelFilters])
     return (
         <div style={{ minWidth: '300px', flex: 1, background: '#f0f0f1', padding: '10px', borderRadius: '4px' }}>
-            <h3 style={{ textTransform: 'capitalize', borderBottom: `3px solid ${config.theme === 'dark' ? '#333' : '#ddd'}`, paddingBottom: '5px' }}>
+            <h3 style={{ textTransform: 'capitalize', borderBottom: `3px solid ${config.theme === 'dark' ? '#333' : '#ddd'}`, paddingBottom: '0', marginBottom: '0px' }}>
                 {col.title} <span style={{ fontSize: '0.8em', color: '#666' }}>({col.tasks.length})</span>
             </h3>
+            <div style={{ padding: '5px' }}>
+                <div><span>{__('Filter By Label', 'es-scrum')}: </span>
+                </div>
+                <div className='labelFilter' style={{ display: 'flex', gap: '5px', overflow: 'auto', padding: '10px' }}>
+
+                    {taskLabels.map((item) => {
+                        const labelIncluded = labelFilters.includes(item.id);
+                        return(
+                        <label onClick={() => toggleLabelFilter(item.id)} key={item.id} style={labelIncluded ? { padding: '2px 3px', border: `1px solid ${item.color}`, color: item.color, borderRadius: '5px', boxShadow: `4px 3px 10px 0px  rgba(0,0,0,0.13)`, textWrapMode: 'nowrap', cursor: 'pointer' } : { padding: '2px 3px', borderBottom: `1px solid ${item.color}`, color: item.color, boxShadow: `4px 3px 10px 0px rgba(0,0,0,0.05)`, textWrapMode: 'nowrap', cursor: 'pointer' }}>{item.name}</label>
+                    )
+                    })}
+                </div>
+            </div>
             {col.tasks.map(task => (
+                (labelFilters.length == 0 || labelFilters.every((id) => {
+                    return task.labels.findIndex((label) => label.id == id) != -1;
+                })) &&
                 <TaskCard key={task.id} task={task} onProfileClick={onProfileClick} onViewDetails={onViewDetails} />
             ))}
         </div>
@@ -100,6 +129,7 @@ const ScrumBoard = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedTask, setSelectedTask] = useState(null);
     const [isConfigOpen, setIsConfigOpen] = useState(false);
+    const [taskLabels, setTaskLabels] = useState([]);
 
     // DC-18: Profile Modal State
     const [isProfileOpen, setIsProfileOpen] = useState(false);
@@ -110,15 +140,19 @@ const ScrumBoard = () => {
         Promise.all([
             apiFetch({ path: '/es-scrum/v1/tasks?per_page=100' }), // Fetch more tasks
             apiFetch({ path: '/es-scrum/v1/config' }).catch(() => null),
-            apiFetch({ path: '/wp/v2/users/me' }).catch(() => null)
+            apiFetch({ path: '/wp/v2/users/me' }).catch(() => null),
+            apiFetch({ path: '/es-scrum/v1/labels?filter=popular&per_page=20' }).catch(() => null)
         ])
-            .then(([tasksData, configData, userData]) => {
+            .then(([tasksData, configData, userData, labelData]) => {
                 setTasks(tasksData);
                 if (configData) {
                     setConfig(configData);
                 }
                 if (userData) {
                     setCurrentUserId(userData.id);
+                }
+                if (labelData) {
+                    setTaskLabels(labelData);
                 }
                 setIsLoading(false);
             })
@@ -226,6 +260,7 @@ const ScrumBoard = () => {
                         key={col.id}
                         col={col}
                         config={config}
+                        taskLabels={taskLabels}
                         onProfileClick={handleProfileClick}
                         onViewDetails={openModal}
                     />
@@ -256,3 +291,5 @@ const ScrumBoard = () => {
 };
 
 export default ScrumBoard;
+
+//! Note: Logic for creating labels is present, but it would make optimal sense to allow creatign new labels when creating new Tasks, but tasks creation logic is currently not implemented

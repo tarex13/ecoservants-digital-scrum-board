@@ -68,6 +68,8 @@ function es_scrum_install_local_tables()
     $table_comments = $prefix . 'comments';
     $table_activity = $prefix . 'activity_log';
     $table_configs = $prefix . 'board_configs';
+    $table_labels = $prefix . 'labels';
+    $table_task_labels = $prefix . 'task_labels'; 
 
     $sql_tasks = "CREATE TABLE {$table_tasks} (
         id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -147,6 +149,29 @@ function es_scrum_install_local_tables()
         UNIQUE KEY program_slug (program_slug)
     ) $charset_collate;";
 
+    $sql_labels = "CREATE TABLE {$table_labels} (
+        id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+        name VARCHAR(100) NOT NULL,
+        color VARCHAR(20) NULL,
+        program_slug VARCHAR(100) NOT NULL,
+        created_by BIGINT(20) UNSIGNED NOT NULL,
+        created_at DATETIME NOT NULL,
+        PRIMARY KEY (id),
+        KEY program_slug (program_slug),
+        KEY name (name)
+    ) $charset_collate;";
+
+    $sql_task_labels = "CREATE TABLE {$table_task_labels} (
+        task_id BIGINT(20) UNSIGNED NOT NULL,
+        label_id BIGINT(20) UNSIGNED NOT NULL,
+        created_by BIGINT(20) UNSIGNED NOT NULL,
+        created_at DATETIME NOT NULL,
+        PRIMARY KEY (task_id, label_id),
+        KEY task_id (task_id),
+        KEY label_id (label_id),
+        UNIQUE KEY task_label (task_id, label_id)
+    ) $charset_collate;";
+
     error_log('[EcoServants Scrum] Running dbDelta...');
 
     dbDelta($sql_tasks);
@@ -154,6 +179,8 @@ function es_scrum_install_local_tables()
     dbDelta($sql_comments);
     dbDelta($sql_activity);
     dbDelta($sql_configs);
+    dbDelta($sql_labels);
+    dbDelta($sql_task_labels);
 
     error_log('[EcoServants Scrum] dbDelta complete.');
 }
@@ -238,7 +265,7 @@ function es_scrum_table_prefix()
 /**
  * Get full table name for a logical slug
  *
- * @param string $slug tasks|sprints|comments|activity_log
+ * @param string $slug tasks|sprints|comments|activity_log|labels|task_labelssure
  * @return string
  */
 function es_scrum_table_name($slug)
@@ -256,6 +283,10 @@ function es_scrum_table_name($slug)
             return $prefix . 'activity_log';
         case 'board_configs':
             return $prefix . 'board_configs';
+        case 'labels':
+            return $prefix . 'labels';
+        case 'task_labels':
+            return $prefix . 'task_labels';
         default:
             return $prefix . $slug;
     }
@@ -611,6 +642,7 @@ function es_scrum_register_rest_routes()
 
     // 2. Sprint API: Use dedicated class
     if (file_exists(plugin_dir_path(__FILE__) . 'includes/api/class-sprint-api.php')) {
+        require_once plugin_dir_path(__FILE__) . 'includes/api/class-sprint-api.php';
         $sprint_api = new EcoServants_Sprint_API();
         $sprint_api->register_routes();
     }
@@ -627,6 +659,13 @@ function es_scrum_register_rest_routes()
         require_once plugin_dir_path(__FILE__) . 'includes/api/class-user-profile-api.php';
         $profile_api = new EcoServants_User_Profile_API();
         $profile_api->register_routes();
+    }
+
+    //6. Scrum Board API
+    if (file_exists(plugin_dir_path(__FILE__) . 'includes/api/class-labels-api.php')) {
+        require_once plugin_dir_path(__FILE__) . 'includes/api/class-labels-api.php';
+        $labels_api = new EcoServants_Scrum_Labels_API();
+        $labels_api->register_routes();
     }
 
     // Ping route
