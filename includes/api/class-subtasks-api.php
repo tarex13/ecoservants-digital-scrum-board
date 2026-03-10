@@ -17,7 +17,7 @@ class EcoServants_Subtasks_API extends WP_REST_Controller
             array(
                 'methods'  => 'GET',
                 'callback' => array($this, 'get_items'),
-                'permission_callback' => '__return_true',
+                'permission_callback' => array($this, 'get_items_permissions_check'),
             ),
             array(
                 'methods'  => 'POST',
@@ -67,6 +67,11 @@ class EcoServants_Subtasks_API extends WP_REST_Controller
     /* ========================
        PERMISSIONS
     ======================== */
+    // Same permission structure for task GET request
+    public function get_items_permissions_check($request)
+    {
+        return true;
+    }
 
     public function modify_permissions_check($request)
     {
@@ -83,7 +88,8 @@ class EcoServants_Subtasks_API extends WP_REST_Controller
         $table = es_scrum_table_name('subtasks');
 
         $page = $request->get_param('page') ? absint($request->get_param('page')) : 1;
-        $per_page = $request->get_param('per_page') ? absint($request->get_param('per_page')) : 50;
+        // ensure per_page is positive
+        $per_page = $request->get_param('per_page') ? absint($request->get_param('per_page')) == 0 ? 1 : absint($request->get_param('per_page')) : 50;
         $offset = ($page - 1) * $per_page;
 
         $parent_task = $request->get_param('parent_task');
