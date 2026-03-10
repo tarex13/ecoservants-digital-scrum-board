@@ -654,7 +654,6 @@ function es_scrum_register_rest_routes()
         $profile_api->register_routes();
     }
 
-<<<<<<< HEAD
     // 5. SubTasks API: Use dedicated class
     if (file_exists(plugin_dir_path(__FILE__) . 'includes/api/class-subtasks-api.php')) {
         require_once plugin_dir_path(__FILE__) . 'includes/api/class-subtasks-api.php';
@@ -676,9 +675,6 @@ function es_scrum_register_rest_routes()
     );
 
     // 3. Comment API: Use dedicated class
-=======
-    // 5. Comment API
->>>>>>> main
     require_once plugin_dir_path(__FILE__) . 'includes/api/class-comment-api.php';
     $comment_api = new EcoServants_Comment_API();
     $comment_api->register_routes();
