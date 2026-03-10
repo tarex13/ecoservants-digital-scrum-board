@@ -604,18 +604,23 @@ function es_scrum_render_settings_page()
  */
 function es_scrum_register_rest_routes()
 {
-    // 1. Task API: Use dedicated class
+    // Load shared response helper
+    require_once plugin_dir_path(__FILE__) . 'includes/api/class-api-response.php';
+
+    // Load security middleware
+    require_once plugin_dir_path(__FILE__) . 'includes/api/class-api-security.php';
+
+    // 1. Task API
     require_once plugin_dir_path(__FILE__) . 'includes/api/class-scrum-board-api.php';
     $task_api = new EcoServants_Scrum_Board_API();
     $task_api->register_routes();
 
-    // 2. Sprint API: Use dedicated class
-    if (file_exists(plugin_dir_path(__FILE__) . 'includes/api/class-sprint-api.php')) {
-        $sprint_api = new EcoServants_Sprint_API();
-        $sprint_api->register_routes();
-    }
+    // 2. Sprint API
+    require_once plugin_dir_path(__FILE__) . 'includes/api/class-sprint-api.php';
+    $sprint_api = new EcoServants_Sprint_API();
+    $sprint_api->register_routes();
 
-    // 3. Board Config API: Use dedicated class
+    // 3. Board Config API
     if (file_exists(plugin_dir_path(__FILE__) . 'includes/api/class-board-config-api.php')) {
         require_once plugin_dir_path(__FILE__) . 'includes/api/class-board-config-api.php';
         $config_api = new EcoServants_Board_Config_API();
@@ -629,21 +634,15 @@ function es_scrum_register_rest_routes()
         $profile_api->register_routes();
     }
 
-    // Ping route
-    register_rest_route(
-        'es-scrum/v1',
-        '/ping',
-        array(
-            'methods' => 'GET',
-            'callback' => 'es_scrum_rest_ping',
-            'permission_callback' => '__return_true', // Public ping for connectivity check
-        )
-    );
-
-    // 3. Comment API: Use dedicated class
+    // 5. Comment API
     require_once plugin_dir_path(__FILE__) . 'includes/api/class-comment-api.php';
     $comment_api = new EcoServants_Comment_API();
     $comment_api->register_routes();
+
+    // 6. Activity Log API (registers GET + POST /activity)
+    require_once plugin_dir_path(__FILE__) . 'includes/api/class-activity-log-api.php';
+    $activity_api = new EcoServants_Activity_Log_API();
+    $activity_api->register_routes();
 
     // DC-11: Recommendations
     register_rest_route(
@@ -666,21 +665,21 @@ function es_scrum_register_rest_routes()
             'methods' => 'POST',
             'callback' => 'es_scrum_rest_claim_task',
             'permission_callback' => function () {
-                return current_user_can('read'); // Basic permission
+                return current_user_can('read');
             },
         )
     );
 
-    // Activity Log Collection
+    // NOTE: /activity routes (GET + POST) are registered by EcoServants_Activity_Log_API above.
+
+    // Ping route (public)
     register_rest_route(
         'es-scrum/v1',
-        '/activity',
+        '/ping',
         array(
-            array(
-                'methods' => 'GET',
-                'callback' => 'es_scrum_rest_get_activity',
-                'permission_callback' => 'es_scrum_rest_permission_check',
-            ),
+            'methods'             => 'GET',
+            'callback'            => 'es_scrum_rest_ping',
+            'permission_callback' => '__return_true',
         )
     );
 }
@@ -707,10 +706,28 @@ function es_scrum_rest_ping(WP_REST_Request $request)
 }
 
 
+/**
+ * Log an activity entry for a task.
+ *
+ * @param int    $task_id    The task ID.
+ * @param int    $user_id    The user performing the action.
+ * @param string $action     The action name (e.g., 'created', 'status_change').
+ * @param string $from_value Previous value (if applicable).
+ * @param string $to_value   New value (if applicable).
+ */
+function es_scrum_log_activity( $task_id, $user_id, $action, $from_value = '', $to_value = '' ) {
+    $db    = es_scrum_db();
+    $table = es_scrum_table_name( 'activity_log' );
 
-
-
-
+    $db->insert( $table, array(
+        'task_id'    => absint( $task_id ),
+        'user_id'    => absint( $user_id ),
+        'action'     => sanitize_text_field( $action ),
+        'from_value' => sanitize_text_field( $from_value ),
+        'to_value'   => sanitize_text_field( $to_value ),
+        'created_at' => current_time( 'mysql' ),
+    ) );
+}
 
 /**
  * Handles comment mentions by sending email notifications.
@@ -865,43 +882,6 @@ function es_scrum_rest_claim_task(WP_REST_Request $request)
 }
 
 /**
- * Helper: Get user's program group
- * Assuming user meta 'es_program_groups' holds the slug
- */
-function es_scrum_get_user_program_group($user_id)
-{
-    // This could return an array or single string. For DC-11 we assume single primary group for simplicity.
-    // Adapting based on 'DC-03' which mentions 'es_program_groups'.
-    $groups = get_user_meta($user_id, 'es_program_groups', true);
-    if (is_array($groups) && !empty($groups)) {
-        return $groups[0];
-    }
-    return $groups; // If string
-}
-
-/**
- * Helper: Log activity
- */
-function es_scrum_log_activity($task_id, $user_id, $action, $from, $to)
-{
-    global $wpdb;
-    $table_activity = es_scrum_table_name('activity_log');
-
-    $wpdb->insert(
-        $table_activity,
-        array(
-            'task_id' => $task_id,
-            'user_id' => $user_id,
-            'action' => $action,
-            'from_value' => $from,
-            'to_value' => $to,
-            'created_at' => current_time('mysql'),
-        ),
-        array('%d', '%d', '%s', '%s', '%s', '%s')
-    );
-}
-
-/**
  * DC-11: Cron job for daily automated tasks
  */
 // Schedule cron on activation if not exists
@@ -992,7 +972,8 @@ function es_scrum_rest_get_activity(WP_REST_Request $request)
         return new WP_Error('missing_param', 'Task ID is required', array('status' => 400));
     }
 
-    $page = $request->get_param('page') ? absint($request->get_param('page')) : 1;
+    $raw_page = $request->get_param('page');
+    $page = max(1, (int) $raw_page);
     $per_page = $request->get_param('per_page') ? absint($request->get_param('per_page')) : 20;
     $offset = ($page - 1) * $per_page;
 
@@ -1008,4 +989,19 @@ function es_scrum_rest_get_activity(WP_REST_Request $request)
     $response->header('X-WP-TotalPages', (int) $max_pages);
 
     return $response;
+}
+
+/**
+ * Get the program group slug associated with a user.
+ * 
+ * @param int $user_id User ID
+ * @return string|null Slug of program group, or null if none.
+ */
+function es_scrum_get_user_program_group($user_id)
+{
+    $groups = get_user_meta($user_id, 'es_program_groups', true);
+    if (is_array($groups) && !empty($groups)) {
+        return $groups[0];
+    }
+    return $groups;
 }
