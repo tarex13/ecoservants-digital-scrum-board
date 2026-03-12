@@ -170,14 +170,20 @@ class EcoServants_Sprint_API extends WP_REST_Controller {
     }
 
     public function create_item_permissions_check( $request ) {
+        $nonce = EcoServants_API_Security::verify_nonce( $request );
+        if ( is_wp_error( $nonce ) ) return $nonce;
         return current_user_can( 'edit_posts' );
     }
 
     public function update_item_permissions_check( $request ) {
+        $nonce = EcoServants_API_Security::verify_nonce( $request );
+        if ( is_wp_error( $nonce ) ) return $nonce;
         return current_user_can( 'edit_posts' );
     }
 
     public function delete_item_permissions_check( $request ) {
+        $nonce = EcoServants_API_Security::verify_nonce( $request );
+        if ( is_wp_error( $nonce ) ) return $nonce;
         return current_user_can( 'edit_posts' );
     }
 
@@ -255,10 +261,20 @@ class EcoServants_Sprint_API extends WP_REST_Controller {
     // ──────────────────────────────────────────────
 
     public function create_item( $request ) {
+        // Rate limit: 10 sprints per hour
+        $rate = EcoServants_API_Security::check_rate_limit( 'create_sprint', 10 );
+        if ( is_wp_error( $rate ) ) return $rate;
+
         $params = $request->get_json_params();
 
         if ( empty( $params['name'] ) ) {
             return EcoServants_API_Response::error( 'missing_name', 'Sprint name is required' );
+        }
+
+        // Validate status if provided
+        if ( isset( $params['status'] ) ) {
+            $check = EcoServants_API_Security::validate_enum( $params['status'], EcoServants_API_Security::sprint_statuses(), 'status' );
+            if ( is_wp_error( $check ) ) return $check;
         }
 
         $db    = es_scrum_db();
@@ -315,6 +331,12 @@ class EcoServants_Sprint_API extends WP_REST_Controller {
         $params = $request->get_json_params();
         if ( empty( $params ) ) {
             return EcoServants_API_Response::error( 'no_data', 'No update data provided' );
+        }
+
+        // Validate status if provided
+        if ( isset( $params['status'] ) ) {
+            $check = EcoServants_API_Security::validate_enum( $params['status'], EcoServants_API_Security::sprint_statuses(), 'status' );
+            if ( is_wp_error( $check ) ) return $check;
         }
 
         // Prevent re-activating archived sprints
@@ -392,13 +414,10 @@ class EcoServants_Sprint_API extends WP_REST_Controller {
         // If archiving, unassign tasks from this sprint
         if ( isset( $update_data['status'] ) && $update_data['status'] === 'archived' ) {
             $tasks_table = es_scrum_table_name( 'tasks' );
-            $db->update(
-                $tasks_table,
-                array( 'sprint_id' => null ),
-                array( 'sprint_id' => $id ),
-                array( '%s' ),
-                array( '%d' )
-            );
+            $db->query( $db->prepare(
+                "UPDATE {$tasks_table} SET sprint_id = NULL WHERE sprint_id = %d",
+                $id
+            ) );
         }
 
         $sprint = $db->get_row( $db->prepare( "SELECT * FROM {$table} WHERE id = %d", $id ) );
@@ -422,13 +441,10 @@ class EcoServants_Sprint_API extends WP_REST_Controller {
 
         // Unassign tasks from this sprint before deleting
         $tasks_table = es_scrum_table_name( 'tasks' );
-        $db->update(
-            $tasks_table,
-            array( 'sprint_id' => null ),
-            array( 'sprint_id' => $id ),
-            array( '%s' ),
-            array( '%d' )
-        );
+        $db->query( $db->prepare(
+            "UPDATE {$tasks_table} SET sprint_id = NULL WHERE sprint_id = %d",
+            $id
+        ) );
 
         $deleted = $db->delete( $table, array( 'id' => $id ), array( '%d' ) );
 
