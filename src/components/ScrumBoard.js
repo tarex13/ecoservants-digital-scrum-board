@@ -17,6 +17,8 @@ const COLUMNS = {
 const ScrumBoard = () => {
     const [tasks, setTasks] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [isModalOpen, setIsModalOpen] = useState(true);
+    const [selectedTask, setSelectedTask] = useState(null);
     const [error, setError] = useState(null);
     const [selectedSprintId, setSelectedSprintId] = useState(null);
     const [sprintManagerOpen, setSprintManagerOpen] = useState(false);
@@ -100,8 +102,7 @@ const ScrumBoard = () => {
                                 <span>{meta.label}</span>
                                 <span style={styles.count}>{columns[status].length}</span>
                             </div>
-                            
-                            {/**<SubTasksList parentTaskId={selectedTask.id}  />*/}
+
                             <div style={styles.columnBody}>
                                 {columns[status].length === 0 && (
                                     <div style={styles.emptyCol}>No tasks</div>
@@ -121,6 +122,16 @@ const ScrumBoard = () => {
                 onClose={() => setSprintManagerOpen(false)}
                 onSprintChange={handleSprintDataChange}
             />
+
+            {isModalOpen && selectedTask && (
+                <Modal title={selectedTask.title} onRequestClose={closeModal} shouldCloseOnClickOutside={true}>
+                    {/** DC-30 */}
+                    <SubTasksList parentTaskId={selectedTask.id} />
+                    <p>{selectedTask.description}</p>
+                    <hr />
+                    <CommentThread taskId={selectedTask.id} />
+                </Modal>
+            )}
         </div>
     );
 };
