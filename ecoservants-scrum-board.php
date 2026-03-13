@@ -154,7 +154,7 @@ function es_scrum_get_table_schemas( $prefix, $charset ) {
             PRIMARY KEY (id),
             KEY parent_task (parent_task),
             KEY sort_order (sort_order)
-        )  {$charset};";
+        )  {$charset};",
 
         "CREATE TABLE {$table_sprints} (
             id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
