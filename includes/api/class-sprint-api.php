@@ -316,7 +316,7 @@ class EcoServants_Sprint_API extends WP_REST_Controller {
     // ──────────────────────────────────────────────
     //  PATCH /sprints/{id} — Update a sprint
     // ──────────────────────────────────────────────
-/* 
+
     public function update_item( $request ) {
         $db    = es_scrum_db();
         $table = es_scrum_table_name( 'sprints' );
@@ -356,7 +356,7 @@ class EcoServants_Sprint_API extends WP_REST_Controller {
         $sprint = $db->get_row( $db->prepare( "SELECT * FROM {$table} WHERE id = %d", $new_id ) );
 
         return EcoServants_API_Response::success( $sprint, 201 );
-    } */
+    }
 
     // ──────────────────────────────────────────────
     //  PATCH /sprints/{id} — Update a sprint
