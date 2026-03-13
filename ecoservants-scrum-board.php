@@ -903,7 +903,7 @@ function es_scrum_register_rest_routes()
     require_once plugin_dir_path(__FILE__) . 'includes/api/class-api-response.php';
 
     // Load security middleware
-    {/**require_once plugin_dir_path(__FILE__) . 'includes/api/class-api-security.php';*/}
+    require_once plugin_dir_path(__FILE__) . 'includes/api/class-api-security.php';
 
     // 1. Task API
     require_once plugin_dir_path(__FILE__) . 'includes/api/class-scrum-board-api.php';

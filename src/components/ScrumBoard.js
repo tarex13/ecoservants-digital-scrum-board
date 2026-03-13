@@ -298,6 +298,7 @@ const TaskCard = memo(({ task, onViewDetails, onProfileClick }) => {
 });
 
 const TaskDetailModal = ({ task, onClose }) => {
+    console.log(task)
     return (
         <Modal
             title={task.title}
@@ -351,7 +352,7 @@ const TaskDetailModal = ({ task, onClose }) => {
 
             <hr style={{ margin: '16px 0', borderColor: '#eee' }} />
 
-            <SubTasksList parentTaskId={selectedTask.id} />
+            <SubTasksList parentTaskId={task.id} />
 
             {/* Comments */}
             <CommentThread taskId={task.id} />
