@@ -87,19 +87,40 @@ class EcoServants_Scrum_Board_API extends WP_REST_Controller {
     public function create_item_permissions_check( $request ) {
         $nonce = EcoServants_API_Security::verify_nonce( $request );
         if ( is_wp_error( $nonce ) ) return $nonce;
-        return current_user_can( 'edit_posts' );
+        if ( ! current_user_can( 'es_scrum_edit' ) ) {
+            return new WP_Error(
+                'forbidden',
+                'You do not have permission to modify Scrum data.',
+                array( 'status' => 403 )
+            );
+        }
+        return true;
     }
 
     public function update_item_permissions_check( $request ) {
         $nonce = EcoServants_API_Security::verify_nonce( $request );
         if ( is_wp_error( $nonce ) ) return $nonce;
-        return current_user_can( 'edit_posts' );
+        if ( ! current_user_can( 'es_scrum_edit' ) ) {
+            return new WP_Error(
+                'forbidden',
+                'You do not have permission to modify Scrum data.',
+                array( 'status' => 403 )
+            );
+        }
+        return true;
     }
 
     public function delete_item_permissions_check( $request ) {
         $nonce = EcoServants_API_Security::verify_nonce( $request );
         if ( is_wp_error( $nonce ) ) return $nonce;
-        return current_user_can( 'edit_posts' );
+        if ( ! current_user_can( 'es_scrum_edit' ) ) {
+            return new WP_Error(
+                'forbidden',
+                'You do not have permission to modify Scrum data.',
+                array( 'status' => 403 )
+            );
+        }
+        return true;
     }
 
     // ──────────────────────────────────────────────
