@@ -130,6 +130,9 @@ class EcoServants_Scrum_Board_API extends WP_REST_Controller {
     public function get_items( $request ) {
         $db    = es_scrum_db();
         $table = es_scrum_table_name( 'tasks' );
+        $tasks_table = es_scrum_table_name( 'tasks' );
+        $join_table  = es_scrum_table_name( 'task_labels' );
+        $labels_table = es_scrum_table_name( 'labels' );
         $pag   = EcoServants_API_Response::parse_pagination( $request, 50 );
 
         // Build WHERE clause with optional filters

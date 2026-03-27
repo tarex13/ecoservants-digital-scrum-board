@@ -35,6 +35,7 @@ const formatDate = (dateStr) => {
 
 const ScrumBoard = () => {
     const [tasks, setTasks] = useState([]);
+    const [config, setConfig] = useState(defaultConfig);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState(null);
     const [selectedSprintId, setSelectedSprintId] = useState(null);
@@ -476,5 +477,3 @@ const styles = {
 };
 
 export default ScrumBoard;
-
-//! Note: Logic for creating labels is present, but it would make optimal sense to allow creatign new labels when creating new Tasks, but tasks creation logic is currently not implemented
