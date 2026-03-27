@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, memo } from '@wordpress/element';
 import apiFetch from '@wordpress/api-fetch';
-import { Spinner, Button, Card, CardBody, CardHeader } from '@wordpress/components';
+import { Spinner, Button, Card, CardBody, CardHeader, Modal } from '@wordpress/components';
 import { __ } from '@wordpress/i18n';
 import SprintFilter from './SprintFilter';
 import SprintManager from './SprintManager';
@@ -8,6 +8,7 @@ import CommentThread from './CommentThread';
 import BoardConfigModal from './BoardConfigModal';
 import UserProfileModal from './UserProfileModal';
 import { defaultConfig } from '../utils/defaultConfig';
+import LabelFilter from './LabelFilter';
 
 const COLUMNS = {
     backlog: { label: 'Backlog', color: '#ddd' },
@@ -39,6 +40,7 @@ const ScrumBoard = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState(null);
     const [selectedSprintId, setSelectedSprintId] = useState(null);
+    const [selectedLabels, setSelectedLabels] = useState([]);
     const [sprintManagerOpen, setSprintManagerOpen] = useState(false);
     const [refreshKey, setRefreshKey] = useState(0);
 
@@ -52,6 +54,7 @@ const ScrumBoard = () => {
     const [isProfileOpen, setIsProfileOpen] = useState(false);
     const [profileUserId, setProfileUserId] = useState(null);
     const [currentUserId, setCurrentUserId] = useState(null);
+    const [labelFilters, setLabelFilters] = useState([]);
 
     const fetchTasks = useCallback(() => {
         setIsLoading(true);
@@ -141,6 +144,11 @@ const ScrumBoard = () => {
     const columns = {};
     Object.keys(COLUMNS).forEach((key) => { columns[key] = []; });
     tasks.forEach((task) => {
+        // Filter tasks by labels
+        if(selectedLabels.length != 0 && !task.labels.some(label => selectedLabels.includes(label.name))){
+            return;
+        }
+        
         const status = task.status || 'backlog';
         if (columns[status]) {
             columns[status].push(task);
@@ -154,15 +162,22 @@ const ScrumBoard = () => {
         ? tasks.find((t) => t.id === selectedTaskId) || null
         : null;
 
+
     return (
         <div className="es-scrum-board">
             {/* Toolbar */}
             <div style={styles.toolbar}>
-                <SprintFilter
-                    key={refreshKey}
-                    selectedSprintId={selectedSprintId}
-                    onSprintChange={handleSprintChange}
-                />
+                <div style={{ display: 'flex', gap: '8px' }}>
+                    <SprintFilter
+                        key={refreshKey}
+                        selectedSprintId={selectedSprintId}
+                        onSprintChange={handleSprintChange}
+                    />
+                    <LabelFilter
+                        selectedLabels={selectedLabels}
+                        setSelectedLabels={setSelectedLabels}
+                    />
+                </div>
                 <div style={{ display: 'flex', gap: '8px' }}>
                     <Button
                         variant="secondary"
@@ -191,7 +206,8 @@ const ScrumBoard = () => {
                 <div style={{ textAlign: 'center', padding: '40px' }}><Spinner /></div>
             ) : (
                 <div style={styles.board}>
-                    {Object.entries(COLUMNS).map(([status, meta]) => (
+                    {Object.entries(COLUMNS).map(([status, meta]) => {   
+                        return (
                         <div key={status} style={styles.column}>
                             <div style={{ ...styles.columnHeader, borderBottom: `3px solid ${meta.color}` }}>
                                 <span>{meta.label}</span>
@@ -201,17 +217,22 @@ const ScrumBoard = () => {
                                 {columns[status].length === 0 && (
                                     <div style={styles.emptyCol}>No tasks</div>
                                 )}
-                                {columns[status].map((task) => (
-                                    <TaskCard
-                                        key={task.id}
-                                        task={task}
-                                        onViewDetails={openModal}
-                                        onProfileClick={handleProfileClick}
-                                    />
-                                ))}
+                                {columns[status].map((task) => {
+                                    return (
+                                        <TaskCard
+                                            key={task.id}
+                                            task={task}
+                                            onViewDetails={openModal}
+                                            onProfileClick={handleProfileClick}
+                                        />
+                                    )
+                                }
+                                )}
                             </div>
                         </div>
-                    ))}
+                    )
+                }
+                )}
                 </div>
             )}
 
@@ -265,7 +286,13 @@ const TaskCard = memo(({ task, onViewDetails, onProfileClick }) => {
                 )}
             </CardHeader>
             {task.description && (
-                <CardBody style={{ padding: '6px 12px 4px' }}>
+                <CardBody style={{ padding: '6px 12px 4px' }}>                    
+                <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap', paddingTop: '8px', paddingBottom: '8px' }}>
+                        {task?.labels?.map(({ name, color }, index) => (
+                            <label key={index} style={{ padding: '2px 6px', fontSize: 'x-small', border: '1px solid ' + color, color, boxShadow: '4px 3px 10px 0px rgba(0,0,0,0.05)', borderRadius: '15px', }}>{name}</label>
+
+                        ))}
+                    </div>
                     <div style={styles.description}>{task.description}</div>
                 </CardBody>
             )}
@@ -339,6 +366,13 @@ const TaskDetailModal = ({ task, onClose }) => {
                         {__('Sprint', 'es-scrum')} #{task.sprint_id}
                     </span>
                 )}
+            </div>
+
+            <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap', paddingTop: '4px', paddingBottom: '10px' }}>
+                        {task?.labels?.map(({ name, color }, index) => (
+                            <label key={index} style={{ padding: '2px 6px', fontSize: 'x-small', borderLeft: '3px solid ' + color, borderTop: '1px solid ' + color, borderBottom: '1px solid ' + color, borderRight: '1px solid ' + color, color, boxShadow: '4px 3px 10px 0px rgba(0,0,0,0.05)', borderRadius: '5px', }}>{name}</label>
+
+                        ))}
             </div>
 
             {/* Description */}
