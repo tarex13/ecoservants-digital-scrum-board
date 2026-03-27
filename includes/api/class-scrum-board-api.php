@@ -85,34 +85,58 @@ class EcoServants_Scrum_Board_API extends WP_REST_Controller {
     }
 
     public function create_item_permissions_check( $request ) {
-        return current_user_can( 'edit_posts' );
+        $nonce = EcoServants_API_Security::verify_nonce( $request );
+        if ( is_wp_error( $nonce ) ) return $nonce;
+        if ( ! current_user_can( 'es_scrum_edit' ) ) {
+            return new WP_Error(
+                'forbidden',
+                'You do not have permission to modify Scrum data.',
+                array( 'status' => 403 )
+            );
+        }
+        return true;
     }
 
     public function update_item_permissions_check( $request ) {
-        return current_user_can( 'edit_posts' );
+        $nonce = EcoServants_API_Security::verify_nonce( $request );
+        if ( is_wp_error( $nonce ) ) return $nonce;
+        if ( ! current_user_can( 'es_scrum_edit' ) ) {
+            return new WP_Error(
+                'forbidden',
+                'You do not have permission to modify Scrum data.',
+                array( 'status' => 403 )
+            );
+        }
+        return true;
     }
 
     public function delete_item_permissions_check( $request ) {
-        return current_user_can( 'edit_posts' );
+        $nonce = EcoServants_API_Security::verify_nonce( $request );
+        if ( is_wp_error( $nonce ) ) return $nonce;
+        if ( ! current_user_can( 'es_scrum_edit' ) ) {
+            return new WP_Error(
+                'forbidden',
+                'You do not have permission to modify Scrum data.',
+                array( 'status' => 403 )
+            );
+        }
+        return true;
     }
 
     // ──────────────────────────────────────────────
-    // GET /tasks — List tasks with pagination, filters, and labels
+    //  GET /tasks — List tasks with pagination & filters
     // ──────────────────────────────────────────────
+
     public function get_items( $request ) {
-
-        $db = es_scrum_db();
-
-        $tasks_table  = es_scrum_table_name( 'tasks' );
-        $labels_table = es_scrum_table_name( 'labels' );
-        $join_table   = es_scrum_table_name( 'task_labels' );
-
-        $pag = EcoServants_API_Response::parse_pagination( $request, 50 );
+        $db    = es_scrum_db();
+        $table = es_scrum_table_name( 'tasks' );
+        $pag   = EcoServants_API_Response::parse_pagination( $request, 50 );
 
         // Build WHERE clause with optional filters
         $where = 'WHERE 1=1';
         $args  = array();
 
+        // Allowed filter columns — explicitly whitelisted to prevent column-name injection.
         $filters = array(
             'status'       => '%s',
             'program_slug' => '%s',
@@ -122,11 +146,17 @@ class EcoServants_Scrum_Board_API extends WP_REST_Controller {
             'type'         => '%s',
         );
 
-        foreach ( $filters as $param => $format ) {
-            $value = $request->get_param( $param );
+        // Column names are safe (defined above), but we validate explicitly for defence-in-depth.
+        $allowed_columns = array_keys( $filters );
 
+        foreach ( $filters as $param => $format ) {
+            // Guard: skip if column is not in our whitelist (should never happen, but be explicit).
+            if ( ! in_array( $param, $allowed_columns, true ) ) {
+                continue;
+            }
+            $value = $request->get_param( $param );
             if ( ! empty( $value ) ) {
-                $where .= " AND t.{$param} = {$format}";
+                $where .= " AND {$param} = {$format}";
                 $args[] = $value;
             }
         }
@@ -249,10 +279,28 @@ class EcoServants_Scrum_Board_API extends WP_REST_Controller {
     // ──────────────────────────────────────────────
 
     public function create_item( $request ) {
+        // Rate limit: 30 tasks per hour
+        $rate = EcoServants_API_Security::check_rate_limit( 'create_task', 30 );
+        if ( is_wp_error( $rate ) ) return $rate;
+
         $params = $request->get_json_params();
 
         if ( empty( $params['title'] ) ) {
             return EcoServants_API_Response::error( 'missing_title', 'Title is required' );
+        }
+
+        // Validate enum fields
+        if ( isset( $params['status'] ) ) {
+            $check = EcoServants_API_Security::validate_enum( $params['status'], EcoServants_API_Security::task_statuses(), 'status' );
+            if ( is_wp_error( $check ) ) return $check;
+        }
+        if ( isset( $params['priority'] ) ) {
+            $check = EcoServants_API_Security::validate_enum( $params['priority'], EcoServants_API_Security::task_priorities(), 'priority' );
+            if ( is_wp_error( $check ) ) return $check;
+        }
+        if ( isset( $params['type'] ) ) {
+            $check = EcoServants_API_Security::validate_enum( $params['type'], EcoServants_API_Security::task_types(), 'type' );
+            if ( is_wp_error( $check ) ) return $check;
         }
 
         $db    = es_scrum_db();
@@ -322,6 +370,20 @@ class EcoServants_Scrum_Board_API extends WP_REST_Controller {
         $params = $request->get_json_params();
         if ( empty( $params ) ) {
             return EcoServants_API_Response::error( 'no_data', 'No update data provided' );
+        }
+
+        // Validate enum fields if present
+        if ( isset( $params['status'] ) ) {
+            $check = EcoServants_API_Security::validate_enum( $params['status'], EcoServants_API_Security::task_statuses(), 'status' );
+            if ( is_wp_error( $check ) ) return $check;
+        }
+        if ( isset( $params['priority'] ) ) {
+            $check = EcoServants_API_Security::validate_enum( $params['priority'], EcoServants_API_Security::task_priorities(), 'priority' );
+            if ( is_wp_error( $check ) ) return $check;
+        }
+        if ( isset( $params['type'] ) ) {
+            $check = EcoServants_API_Security::validate_enum( $params['type'], EcoServants_API_Security::task_types(), 'type' );
+            if ( is_wp_error( $check ) ) return $check;
         }
 
         // Build update data from allowed fields
