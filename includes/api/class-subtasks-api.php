@@ -70,7 +70,7 @@ class EcoServants_Subtasks_API extends WP_REST_Controller
     // Same permission structure for task GET request
     public function get_items_permissions_check($request)
     {
-        return true;
+        return es_scrum_rest_permission_check();
     }
 
     public function modify_permissions_check($request)
