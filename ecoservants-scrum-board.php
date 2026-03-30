@@ -10,7 +10,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('ES_SCRUM_VERSION', '1.0.2');
+define('ES_SCRUM_VERSION', '1.0.3');
 define('ES_SCRUM_PLUGIN_FILE', __FILE__);
 define('ES_SCRUM_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('ES_SCRUM_PLUGIN_URL', plugin_dir_url(__FILE__));
@@ -155,6 +155,7 @@ function es_scrum_get_table_schemas( $prefix, $charset ) {
             story_points INT(11) NULL,
             tags TEXT NULL,
             due_date DATETIME NULL,
+            attachments TEXT NULL,
             created_at DATETIME NOT NULL,
             updated_at DATETIME NOT NULL,
             PRIMARY KEY (id),
@@ -428,6 +429,10 @@ function es_scrum_admin_assets($hook)
 
     // Enqueue React app
     $asset_file_path = ES_SCRUM_PLUGIN_DIR . 'build/index.asset.php';
+    
+    // Support WordPress Media Library for attachments
+    wp_enqueue_media();
+    
     if (file_exists($asset_file_path)) {
         $asset_file = include($asset_file_path);
         wp_enqueue_script(

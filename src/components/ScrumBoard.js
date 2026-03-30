@@ -1,13 +1,14 @@
 import { useState, useEffect, useCallback, memo } from '@wordpress/element';
 import apiFetch from '@wordpress/api-fetch';
-import { Spinner, Button, Card, CardBody, CardHeader, Modal } from '@wordpress/components';
+import { Spinner, Button, Card, CardBody, CardHeader } from '@wordpress/components';
 import { __ } from '@wordpress/i18n';
 import SprintFilter from './SprintFilter';
 import SprintManager from './SprintManager';
-import CommentThread from './CommentThread';
 import BoardConfigModal from './BoardConfigModal';
 import UserProfileModal from './UserProfileModal';
 import { defaultConfig } from '../utils/defaultConfig';
+import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
+import TaskModal from './TaskModal';
 
 const COLUMNS = {
     backlog: { label: 'Backlog', color: '#ddd' },
@@ -22,16 +23,6 @@ const PRIORITY_COLORS = {
     low: '#00a32a',
 };
 
-/**
- * Format a date string for display.
- * Pure function — no closure deps, safe at module level.
- */
-const formatDate = (dateStr) => {
-    if (!dateStr) return null;
-    return new Date(dateStr).toLocaleDateString(undefined, {
-        year: 'numeric', month: 'short', day: 'numeric',
-    });
-};
 
 const ScrumBoard = () => {
     const [tasks, setTasks] = useState([]);
@@ -44,6 +35,7 @@ const ScrumBoard = () => {
 
     // Task detail modal — store ID, derive task from live array
     const [selectedTaskId, setSelectedTaskId] = useState(null);
+    const [isCreatingTask, setIsCreatingTask] = useState(false);
 
     // Board config modal
     const [isConfigOpen, setIsConfigOpen] = useState(false);
@@ -115,6 +107,29 @@ const ScrumBoard = () => {
         }
     };
 
+    const handleDragEnd = (result) => {
+        if (!result.destination) return;
+        const { source, destination, draggableId } = result;
+
+        if (source.droppableId === destination.droppableId && source.index === destination.index) return;
+
+        const taskId = String(draggableId);
+        const newStatus = destination.droppableId;
+
+        // Optimistically update (compare as strings — API returns id as string)
+        setTasks(prev => prev.map(t => String(t.id) === taskId ? { ...t, status: newStatus } : t));
+
+        // API patch
+        apiFetch({
+            path: `/es-scrum/v1/tasks/${parseInt(taskId, 10)}`,
+            method: 'PATCH',
+            data: { status: newStatus }
+        }).catch(err => {
+            console.error('Failed to move task', err);
+            fetchTasks(); // Revert on failure
+        });
+    };
+
     const saveConfig = (newConfig) => {
         setIsLoading(true);
         apiFetch({
@@ -165,6 +180,13 @@ const ScrumBoard = () => {
                 />
                 <div style={{ display: 'flex', gap: '8px' }}>
                     <Button
+                        variant="primary"
+                        onClick={() => setIsCreatingTask(true)}
+                        icon="plus"
+                    >
+                        {__('Create Task', 'es-scrum')}
+                    </Button>
+                    <Button
                         variant="secondary"
                         onClick={openMyProfile}
                     >
@@ -190,29 +212,53 @@ const ScrumBoard = () => {
             {isLoading ? (
                 <div style={{ textAlign: 'center', padding: '40px' }}><Spinner /></div>
             ) : (
-                <div style={styles.board}>
-                    {Object.entries(COLUMNS).map(([status, meta]) => (
-                        <div key={status} style={styles.column}>
-                            <div style={{ ...styles.columnHeader, borderBottom: `3px solid ${meta.color}` }}>
-                                <span>{meta.label}</span>
-                                <span style={styles.count}>{columns[status].length}</span>
-                            </div>
-                            <div style={styles.columnBody}>
-                                {columns[status].length === 0 && (
-                                    <div style={styles.emptyCol}>No tasks</div>
+                <DragDropContext onDragEnd={handleDragEnd}>
+                    <div style={styles.board}>
+                        {Object.entries(COLUMNS).map(([status, meta]) => (
+                            <Droppable key={status} droppableId={status}>
+                                {(provided, snapshot) => (
+                                    <div 
+                                        ref={provided.innerRef} 
+                                        {...provided.droppableProps}
+                                        style={{ ...styles.column, background: snapshot.isDraggingOver ? '#e3f2fd' : '#f0f0f1' }}
+                                    >
+                                        <div style={{ ...styles.columnHeader, borderBottom: `3px solid ${meta.color}` }}>
+                                            <span>{meta.label}</span>
+                                            <span style={styles.count}>{columns[status].length}</span>
+                                        </div>
+                                        <div style={styles.columnBody}>
+                                            {columns[status].length === 0 && (
+                                                <div style={styles.emptyCol}>No tasks</div>
+                                            )}
+                                            {columns[status].map((task, index) => (
+                                                <Draggable key={task.id} draggableId={String(task.id)} index={index}>
+                                                    {(provided, snapshot) => (
+                                                        <div
+                                                            ref={provided.innerRef}
+                                                            {...provided.draggableProps}
+                                                            {...provided.dragHandleProps}
+                                                            style={{
+                                                                ...provided.draggableProps.style,
+                                                                opacity: snapshot.isDragging ? 0.8 : 1,
+                                                            }}
+                                                        >
+                                                            <TaskCard
+                                                                task={task}
+                                                                onViewDetails={openModal}
+                                                                onProfileClick={handleProfileClick}
+                                                            />
+                                                        </div>
+                                                    )}
+                                                </Draggable>
+                                            ))}
+                                            {provided.placeholder}
+                                        </div>
+                                    </div>
                                 )}
-                                {columns[status].map((task) => (
-                                    <TaskCard
-                                        key={task.id}
-                                        task={task}
-                                        onViewDetails={openModal}
-                                        onProfileClick={handleProfileClick}
-                                    />
-                                ))}
-                            </div>
-                        </div>
-                    ))}
-                </div>
+                            </Droppable>
+                        ))}
+                    </div>
+                </DragDropContext>
             )}
 
             {/* Sprint Manager Panel */}
@@ -223,8 +269,29 @@ const ScrumBoard = () => {
             />
 
             {/* Task Detail Modal */}
-            {selectedTask && (
-                <TaskDetailModal task={selectedTask} onClose={closeModal} />
+            {(selectedTask || isCreatingTask) && (
+                <TaskModal 
+                    task={selectedTask}
+                    onClose={() => { closeModal(); setIsCreatingTask(false); }}
+                    onSave={(saved) => {
+                         setTasks(prev => {
+                             const idx = prev.findIndex(t => t.id === saved.id);
+                             if (idx > -1) {
+                                 const copy = [...prev];
+                                 copy[idx] = saved;
+                                 return copy;
+                             }
+                             return [saved, ...prev];
+                         });
+                         closeModal(); 
+                         setIsCreatingTask(false);
+                    }}
+                    onDelete={(deletedId) => {
+                         setTasks(prev => prev.filter(t => String(t.id) !== String(deletedId)));
+                         closeModal();
+                         setIsCreatingTask(false);
+                    }}
+                />
             )}
 
             {/* Board Config Modal */}
@@ -296,65 +363,7 @@ const TaskCard = memo(({ task, onViewDetails, onProfileClick }) => {
     );
 });
 
-const TaskDetailModal = ({ task, onClose }) => {
-    return (
-        <Modal
-            title={task.title}
-            onRequestClose={onClose}
-            shouldCloseOnClickOutside={true}
-            style={{ maxWidth: '680px', width: '100%' }}
-        >
-            {/* Meta row */}
-            <div style={styles.modalMeta}>
-                {task.status && (
-                    <span style={styles.metaBadge}>
-                        {__('Status', 'es-scrum')}: <strong>{task.status}</strong>
-                    </span>
-                )}
-                {task.priority && (
-                    <span style={{
-                        ...styles.metaBadge,
-                        borderLeft: `3px solid ${PRIORITY_COLORS[task.priority] || '#ccc'}`,
-                    }}>
-                        {__('Priority', 'es-scrum')}: <strong>{task.priority}</strong>
-                    </span>
-                )}
-                {task.type && (
-                    <span style={styles.metaBadge}>
-                        {__('Type', 'es-scrum')}: <strong>{task.type}</strong>
-                    </span>
-                )}
-                {task.story_points && (
-                    <span style={styles.metaBadge}>
-                        {__('Points', 'es-scrum')}: <strong>{task.story_points}</strong>
-                    </span>
-                )}
-                {task.due_date && (
-                    <span style={styles.metaBadge}>
-                        {__('Due', 'es-scrum')}: <strong>{formatDate(task.due_date)}</strong>
-                    </span>
-                )}
-                {task.sprint_id && (
-                    <span style={{ ...styles.metaBadge, background: '#e8f0fb' }}>
-                        {__('Sprint', 'es-scrum')} #{task.sprint_id}
-                    </span>
-                )}
-            </div>
 
-            {/* Description */}
-            {task.description && (
-                <div style={styles.modalDescription}>
-                    <p style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{task.description}</p>
-                </div>
-            )}
-
-            <hr style={{ margin: '16px 0', borderColor: '#eee' }} />
-
-            {/* Comments */}
-            <CommentThread taskId={task.id} />
-        </Modal>
-    );
-};
 
 const styles = {
     toolbar: {
@@ -451,28 +460,6 @@ const styles = {
     },
     assignee: {
         fontSize: '14px',
-    },
-    // Modal styles
-    modalMeta: {
-        display: 'flex',
-        flexWrap: 'wrap',
-        gap: '8px',
-        marginBottom: '12px',
-    },
-    metaBadge: {
-        fontSize: '12px',
-        background: '#f0f0f1',
-        padding: '4px 10px',
-        borderRadius: '4px',
-        color: '#333',
-    },
-    modalDescription: {
-        background: '#f9f9f9',
-        borderRadius: '4px',
-        padding: '12px',
-        fontSize: '13px',
-        color: '#333',
-        lineHeight: 1.6,
     },
 };
 
