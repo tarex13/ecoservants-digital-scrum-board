@@ -122,7 +122,7 @@ class EcoServants_Scrum_Labels_API extends WP_REST_Controller
 
     public function get_items_permissions_check($request)
     {
-        return true;
+        return es_scrum_rest_permission_check();
     }
 
     public function create_item_permissions_check($request)
@@ -269,6 +269,7 @@ class EcoServants_Scrum_Labels_API extends WP_REST_Controller
         $data = array(
             'name' => sanitize_text_field($params['name']),
             'color' => isset($params['color']) ? sanitize_text_field($params['color']) : null,
+            'desc' => isset($params['desc']) ? sanitize_text_field($params['desc']) : null,
             'program_slug' => isset($params['program_slug']) ? sanitize_text_field($params['program_slug']) : 'default-program',
             'created_at' => current_time('mysql', 1)
         );

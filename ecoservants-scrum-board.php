@@ -217,6 +217,7 @@ function es_scrum_get_table_schemas( $prefix, $charset ) {
             id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
             name VARCHAR(100) NOT NULL,
             color VARCHAR(20) NULL,
+            desc VARCHAR(200) NULL,
             program_slug VARCHAR(100) NOT NULL,
             created_by BIGINT(20) UNSIGNED NOT NULL,
             created_at DATETIME NOT NULL,

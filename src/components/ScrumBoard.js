@@ -9,6 +9,7 @@ import BoardConfigModal from './BoardConfigModal';
 import UserProfileModal from './UserProfileModal';
 import { defaultConfig } from '../utils/defaultConfig';
 import LabelFilter from './LabelFilter';
+import LabelManager from './LabelManager';
 
 const COLUMNS = {
     backlog: { label: 'Backlog', color: '#ddd' },
@@ -42,6 +43,7 @@ const ScrumBoard = () => {
     const [selectedSprintId, setSelectedSprintId] = useState(null);
     const [selectedLabels, setSelectedLabels] = useState([]);
     const [sprintManagerOpen, setSprintManagerOpen] = useState(false);
+    const [labelManagerOpen, setLabelManagerOpen] = useState(false);
     const [refreshKey, setRefreshKey] = useState(0);
 
     // Task detail modal — store ID, derive task from live array
@@ -94,6 +96,11 @@ const ScrumBoard = () => {
     };
 
     const handleSprintDataChange = () => {
+        setRefreshKey((k) => k + 1);
+        fetchTasks();
+    };
+
+    const handleLabelDataChange = () => {
         setRefreshKey((k) => k + 1);
         fetchTasks();
     };
@@ -198,6 +205,13 @@ const ScrumBoard = () => {
                     >
                         {__('Manage Sprints', 'es-scrum')}
                     </Button>
+                    <Button
+                        variant="secondary"
+                        onClick={() => setLabelManagerOpen(true)}
+                        icon="tag"
+                    >
+                        {__('Manage Labels', 'es-scrum')}
+                    </Button>
                 </div>
             </div>
 
@@ -241,6 +255,12 @@ const ScrumBoard = () => {
                 isOpen={sprintManagerOpen}
                 onClose={() => setSprintManagerOpen(false)}
                 onSprintChange={handleSprintDataChange}
+            />
+
+            <LabelManager 
+                isOpen={labelManagerOpen}
+                onClose={() => setLabelManagerOpen(false)}
+                onLabelChange={handleLabelDataChange}
             />
 
             {/* Task Detail Modal */}
@@ -287,9 +307,9 @@ const TaskCard = memo(({ task, onViewDetails, onProfileClick }) => {
             </CardHeader>
             {task.description && (
                 <CardBody style={{ padding: '6px 12px 4px' }}>                    
-                <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap', paddingTop: '8px', paddingBottom: '8px' }}>
+                <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap', paddingTop: '4px', paddingBottom: '8px' }}>
                         {task?.labels?.map(({ name, color }, index) => (
-                            <label key={index} style={{ padding: '2px 6px', fontSize: 'x-small', border: '1px solid ' + color, color, boxShadow: '4px 3px 10px 0px rgba(0,0,0,0.05)', borderRadius: '15px', }}>{name}</label>
+                            <label key={index} style={{ padding: '2px 6px', fontSize: 'x-small', border: '1px solid ' + color, background: color+"0e", color, marginBottom: '2px', borderRadius: '12px', fontWeight: 700}}>{name}</label>
 
                         ))}
                     </div>
@@ -371,6 +391,7 @@ const TaskDetailModal = ({ task, onClose }) => {
             <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap', paddingTop: '4px', paddingBottom: '10px' }}>
                         {task?.labels?.map(({ name, color }, index) => (
                             <label key={index} style={{ padding: '2px 6px', fontSize: 'x-small', borderLeft: '3px solid ' + color, borderTop: '1px solid ' + color, borderBottom: '1px solid ' + color, borderRight: '1px solid ' + color, color, boxShadow: '4px 3px 10px 0px rgba(0,0,0,0.05)', borderRadius: '5px', }}>{name}</label>
+                            
 
                         ))}
             </div>
