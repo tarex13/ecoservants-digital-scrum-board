@@ -87,19 +87,40 @@ class EcoServants_Scrum_Board_API extends WP_REST_Controller {
     public function create_item_permissions_check( $request ) {
         $nonce = EcoServants_API_Security::verify_nonce( $request );
         if ( is_wp_error( $nonce ) ) return $nonce;
-        return current_user_can( 'edit_posts' );
+        if ( ! current_user_can( 'es_scrum_edit' ) ) {
+            return new WP_Error(
+                'forbidden',
+                'You do not have permission to modify Scrum data.',
+                array( 'status' => 403 )
+            );
+        }
+        return true;
     }
 
     public function update_item_permissions_check( $request ) {
         $nonce = EcoServants_API_Security::verify_nonce( $request );
         if ( is_wp_error( $nonce ) ) return $nonce;
-        return current_user_can( 'edit_posts' );
+        if ( ! current_user_can( 'es_scrum_edit' ) ) {
+            return new WP_Error(
+                'forbidden',
+                'You do not have permission to modify Scrum data.',
+                array( 'status' => 403 )
+            );
+        }
+        return true;
     }
 
     public function delete_item_permissions_check( $request ) {
         $nonce = EcoServants_API_Security::verify_nonce( $request );
         if ( is_wp_error( $nonce ) ) return $nonce;
-        return current_user_can( 'edit_posts' );
+        if ( ! current_user_can( 'es_scrum_edit' ) ) {
+            return new WP_Error(
+                'forbidden',
+                'You do not have permission to modify Scrum data.',
+                array( 'status' => 403 )
+            );
+        }
+        return true;
     }
 
     // ──────────────────────────────────────────────
@@ -241,6 +262,7 @@ class EcoServants_Scrum_Board_API extends WP_REST_Controller {
             'story_points' => isset( $params['story_points'] ) ? absint( $params['story_points'] ) : null,
             'tags'         => isset( $params['tags'] ) ? sanitize_text_field( $params['tags'] ) : null,
             'due_date'     => ! empty( $params['due_date'] ) ? sanitize_text_field( $params['due_date'] ) : null,
+            'attachments'  => isset( $params['attachments'] ) ? sanitize_textarea_field( wp_unslash( $params['attachments'] ) ) : null,
             'created_at'   => $now,
             'updated_at'   => $now,
         );
@@ -306,6 +328,7 @@ class EcoServants_Scrum_Board_API extends WP_REST_Controller {
             'program_slug' => 'sanitize_text_field',
             'tags'         => 'sanitize_text_field',
             'due_date'     => 'sanitize_text_field',
+            'attachments'  => 'sanitize_textarea_field',
         );
 
         $update_data = array();

@@ -51,7 +51,27 @@ class EcoServants_User_Profile_API extends WP_REST_Controller
      */
     public function get_item_permissions_check($request)
     {
-        return is_user_logged_in();
+        if (!current_user_can('es_scrum_view')) {
+            return new WP_Error(
+                'forbidden',
+                'You do not have permission to view this board.',
+                array('status' => 403)
+            );
+        }
+
+        // Interns can only view their own profile
+        if ( EcoServants_Scrum_Roles::current_user_is_intern() ) {
+            $requested_id = (int) $request->get_param( 'id' );
+            if ( $requested_id !== get_current_user_id() ) {
+                return new WP_Error(
+                    'es_scrum_forbidden_profile',
+                    __( 'You can only view your own profile.', 'es-scrum' ),
+                    array( 'status' => 403 )
+                );
+            }
+        }
+
+        return true;
     }
 
     /**

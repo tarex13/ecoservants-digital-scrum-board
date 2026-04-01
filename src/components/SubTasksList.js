@@ -13,6 +13,8 @@ const SubTasksItem = memo(({ index, checkedSubTasks, setCheckedSubTasks, item, s
     const [notesEditValue, setNotesEditValue] = useState(item?.notes);
     const [isEditing, setIsEditing] = useState(false);
     const [error, setError] = useState(null);
+
+    
     const checked = checkedSubTasks.includes(index);
     const toggleCheckClick = () => {
         apiFetch({
