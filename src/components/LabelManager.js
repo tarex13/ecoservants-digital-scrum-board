@@ -30,7 +30,7 @@ const LabelManager = ({ isOpen, onClose, onLabelChange }) => {
     // Analytics
     const [analyticsId, setAnalyticsId] = useState(null);
 
-    const fetchSprints = useCallback(() => {
+    const fetchLabels = useCallback(() => {
         setIsLoading(true);
         apiFetch({ path: '/es-scrum/v1/labels?per_page=50&filter=popular' })
             .then((data) => {
@@ -54,11 +54,11 @@ const LabelManager = ({ isOpen, onClose, onLabelChange }) => {
     }, []);
 
     useEffect(() => {
-        if (isOpen) fetchSprints();
-    }, [isOpen, fetchSprints]);
+        if (isOpen) fetchLabels();
+    }, [isOpen, fetchLabels]);
 
     const resetForm = () => {
-        setFormData({ name: '', start_date: '', end_date: '', goal: '', status: 'planned' });
+        setFormData({ name: '', desc: '', color: '' });
         setEditingId(null);
         setShowForm(false);
     };
@@ -67,14 +67,12 @@ const LabelManager = ({ isOpen, onClose, onLabelChange }) => {
         if (!formData.name.trim()) return;
         setSaving(true);
 
-        const request = editingId
-            ? apiFetch({ path: `/es-scrum/v1/sprints/${editingId}`, method: 'PATCH', data: formData })
-            : apiFetch({ path: '/es-scrum/v1/sprints', method: 'POST', data: formData });
+        const request = apiFetch({ path: '/es-scrum/v1/labels', method: 'POST', data: formData });
 
         request
             .then(() => {
                 resetForm();
-                fetchSprints();
+                fetchLabels();
                 if (onLabelChange) onLabelChange();
             })
             .catch((err) => console.error('Save failed:', err))
@@ -98,7 +96,7 @@ const LabelManager = ({ isOpen, onClose, onLabelChange }) => {
         if (!window.confirm(`Archive "${sprint.name}"? Tasks will be unassigned from this sprint.`)) return;
         apiFetch({ path: `/es-scrum/v1/sprints/${sprint.id}`, method: 'PATCH', data: { status: 'archived' } })
             .then(() => {
-                fetchSprints();
+                fetchLabels();
                 if (onLabelChange) onLabelChange();
             })
             .catch((err) => console.error('Archive failed:', err));
@@ -108,7 +106,7 @@ const LabelManager = ({ isOpen, onClose, onLabelChange }) => {
         if (!window.confirm(`Permanently delete "${sprint.name}"? This cannot be undone.`)) return;
         apiFetch({ path: `/es-scrum/v1/sprints/${sprint.id}`, method: 'DELETE' })
             .then(() => {
-                fetchSprints();
+                fetchLabels();
                 if (onLabelChange) onLabelChange();
             })
             .catch((err) => console.error('Delete failed:', err));
@@ -155,14 +153,14 @@ const LabelManager = ({ isOpen, onClose, onLabelChange }) => {
                                 <input
                                     type="text"
                                     value={formData.color}
-                                    onChange={(e) => setFormData({ ...formData, color: color })}
+                                    onChange={(e) => setFormData({ ...formData, color: e.target.value })}
                                     style={styles.label}
                                 />
                             </div>
                         </div>
                         <div style={{ display: 'flex', gap: '8px' }}>
                             <Button variant="primary" onClick={handleSave} isBusy={saving} disabled={saving}>
-                                {editingId ? 'Update' : 'Create'}
+                                Create
                             </Button>
                             <Button variant="tertiary" onClick={resetForm}>Cancel</Button>
                         </div>
@@ -170,7 +168,7 @@ const LabelManager = ({ isOpen, onClose, onLabelChange }) => {
                 ) : (
                     <Button
                         variant="primary"
-                        onClick={() => { setShowForm(true); setAnalyticsId(null); }}
+                        onClick={() => { setShowForm(true); }}
                         style={{ margin: '16px' }}
                     >
                         + New Label

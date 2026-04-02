@@ -217,14 +217,14 @@ function es_scrum_get_table_schemas( $prefix, $charset ) {
             id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
             name VARCHAR(100) NOT NULL,
             color VARCHAR(20) NULL,
-            desc VARCHAR(200) NULL,
+            description VARCHAR(200) NULL,
             program_slug VARCHAR(100) NOT NULL,
             created_by BIGINT(20) UNSIGNED NOT NULL,
             created_at DATETIME NOT NULL,
             PRIMARY KEY (id),
             KEY program_slug (program_slug),
             KEY name (name)
-        ) $charset_collate;",
+        ) {$charset};",
 
         "CREATE TABLE {$table_task_labels} (
             task_id BIGINT(20) UNSIGNED NOT NULL,
@@ -232,10 +232,9 @@ function es_scrum_get_table_schemas( $prefix, $charset ) {
             created_by BIGINT(20) UNSIGNED NOT NULL,
             created_at DATETIME NOT NULL,
             PRIMARY KEY (task_id, label_id),
-            KEY task_id (task_id),
             KEY label_id (label_id),
             UNIQUE KEY task_label (task_id, label_id)
-        ) $charset_collate;",
+        ) {$charset};",
 
         "CREATE TABLE {$table_configs} (
             id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -244,7 +243,7 @@ function es_scrum_get_table_schemas( $prefix, $charset ) {
             updated_at DATETIME NOT NULL,
             PRIMARY KEY (id),
             UNIQUE KEY program_slug (program_slug)
-        ) {$charset};",
+        ) {$charset};"
     ];
 }
 

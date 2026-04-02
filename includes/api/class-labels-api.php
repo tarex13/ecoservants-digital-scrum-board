@@ -122,7 +122,7 @@ class EcoServants_Scrum_Labels_API extends WP_REST_Controller
 
     public function get_items_permissions_check($request)
     {
-        return es_scrum_rest_permission_check();
+        return current_user_can('es_scrum_view');
     }
 
     public function create_item_permissions_check($request)
