@@ -3,7 +3,7 @@ import apiFetch from '@wordpress/api-fetch';
 import { FormTokenField, SelectControl } from '@wordpress/components';
 import { __ } from '@wordpress/i18n';
 
-const LabelFilter = ({ selectedLabels, setSelectedLabels }) => {
+const LabelFilter = ({ selectedLabels, setSelectedLabels, inNewForm=false, refreshKey=null }) => {
     const [labels, setLabels] = useState([]);
 
     const fetchLabels = useCallback(() => {
@@ -12,53 +12,42 @@ const LabelFilter = ({ selectedLabels, setSelectedLabels }) => {
                 setLabels(data);
             })
             .catch((err) => console.error('Failed to fetch labels for filter:', err));
+        
     }, []);
 
     useEffect(() => {
         fetchLabels();
-    }, []);
+    }, [refreshKey]);
 
-    // // Refresh when selected label changes
-    // useEffect(() => {
-    //     fetchLabels();
-    // }, [selectedLabelId, fetchLabels]);
+    const suggestions = inNewForm ? labels?.map((l) => {return {label: l.name, value: l.id}}) : labels?.map((l) => l.name);
 
-    const suggestions = labels.map((l) => l.name);
-
-    return (
-        <FormTokenField
-            __experimentalAutoSelectFirstMatch
-            __experimentalExpandOnFocus
-            __nextHasNoMarginBottom
-            maxSuggestions={6}
-            maxLength={5}
-            label={__("Label Filter", 'es-scrum')}
-            onChange={(l) => setSelectedLabels(l)}
-            suggestions={suggestions}
-            value={selectedLabels}
-        />
-
-    );
-};
-
-const styles = {
-    container: {
-        marginBottom: '16px',
-    },
-    filterRow: {
-        display: 'flex',
-        alignItems: 'flex-end',
-        gap: '12px',
-    },
-    goal: {
-        marginTop: '8px',
-        padding: '8px 12px',
-        background: '#f0f6fc',
-        border: '1px solid #c3d1e0',
-        borderRadius: '4px',
-        fontSize: '13px',
-        color: '#1d2327',
-    },
+    if(inNewForm){
+        return (
+            <SelectControl 
+                    __next40pxDefaultSize
+                    label={__("Add Labels", 'es-scrum')}
+                    help={__("Hold down Ctrl (Windows) or Command (Mac) to select multiple options.", 'es-scrum')}
+                    value={ selectedLabels }
+                    options={ suggestions }
+                    multiple
+                    onChange={ setSelectedLabels }
+                />
+        )
+    }else{
+        return (
+            <FormTokenField
+                __experimentalAutoSelectFirstMatch
+                __experimentalExpandOnFocus
+                __nextHasNoMarginBottom
+                maxSuggestions={6}
+                maxLength={5}
+                label={__("Label Filter", 'es-scrum')}
+                onChange={(l) => setSelectedLabels(l)}
+                suggestions={suggestions}
+                value={selectedLabels}
+            />
+        )
+    }
 };
 
 export default LabelFilter;

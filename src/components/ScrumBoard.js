@@ -196,6 +196,7 @@ const ScrumBoard = () => {
                         onSprintChange={handleSprintChange}
                     />
                     <LabelFilter
+                        key={refreshKey}
                         selectedLabels={selectedLabels}
                         setSelectedLabels={setSelectedLabels}
                     />

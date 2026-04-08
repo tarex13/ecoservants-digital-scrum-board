@@ -47,6 +47,12 @@ class EcoServants_Scrum_Labels_API extends WP_REST_Controller
         register_rest_route($this->namespace, '/' . $this->rest_base . '/(?P<id>[\d]+)', array(
 
             array(
+                'methods'             => 'PUT',
+                'callback'            => array($this, 'update_label'),
+                'permission_callback' => array($this, 'create_item_permissions_check'),
+            ),
+
+            array(
                 'methods' => 'DELETE',
                 'callback' => array($this, 'delete_label'),
                 'permission_callback' => array($this, 'delete_item_permissions_check'),
@@ -122,7 +128,7 @@ class EcoServants_Scrum_Labels_API extends WP_REST_Controller
 
     public function get_items_permissions_check($request)
     {
-        return current_user_can('es_scrum_view');
+        return es_scrum_rest_permission_check();
     }
 
     public function create_item_permissions_check($request)
@@ -269,7 +275,7 @@ class EcoServants_Scrum_Labels_API extends WP_REST_Controller
         $data = array(
             'name' => sanitize_text_field($params['name']),
             'color' => isset($params['color']) ? sanitize_text_field($params['color']) : null,
-            'desc' => isset($params['desc']) ? sanitize_text_field($params['desc']) : null,
+            'description' => isset($params['description']) ? sanitize_text_field($params['description']) : null,
             'program_slug' => isset($params['program_slug']) ? sanitize_text_field($params['program_slug']) : 'default-program',
             'created_at' => current_time('mysql', 1)
         );
@@ -288,6 +294,63 @@ class EcoServants_Scrum_Labels_API extends WP_REST_Controller
         ), 201);
     }
 
+    /*
+    ---------------------------------------
+    UPDATE LABEL
+    PUT /labels/{id}
+    ---------------------------------------
+    */
+
+    public function update_label($request)
+    {
+        $id     = (int) $request['id'];
+        $params = $request->get_json_params();
+
+        if (empty($id)) {
+            return new WP_Error('missing_id', 'Label ID required', array('status' => 400));
+        }
+
+        $db    = es_scrum_db();
+        $table = es_scrum_table_name('labels');
+
+        // Check label exists
+        $existing = $db->get_row($db->prepare("SELECT * FROM $table WHERE id = %d", $id));
+        if (!$existing) {
+            return new WP_Error('not_found', 'Label not found', array('status' => 404));
+        }
+
+        // Only update fields that were passed in
+        $data = array();
+
+        if (isset($params['name'])) {
+            $data['name'] = sanitize_text_field($params['name']);
+        }
+        if (isset($params['color'])) {
+            $data['color'] = sanitize_text_field($params['color']);
+        }
+        if (isset($params['description'])) {
+            $data['description'] = sanitize_text_field($params['description']);
+        }
+        if (isset($params['program_slug'])) {
+            $data['program_slug'] = sanitize_text_field($params['program_slug']);
+        }
+
+        if (empty($data)) {
+            return new WP_Error('no_fields', 'No fields to update', array('status' => 400));
+        }
+
+        $result = $db->update($table, $data, array('id' => $id));
+
+        if ($result === false) {
+            return new WP_Error('db_error', 'Could not update label', array('status' => 500));
+        }
+
+        return new WP_REST_Response(array(
+            'id'      => $id,
+            'message' => 'Label updated',
+            'data'    => $data,
+        ), 200);
+    }
 
     /*
     ---------------------------------------

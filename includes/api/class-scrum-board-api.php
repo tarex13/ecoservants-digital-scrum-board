@@ -123,6 +123,96 @@ class EcoServants_Scrum_Board_API extends WP_REST_Controller {
         return true;
     }
 
+    
+    // ──────────────────────────────────────────────
+    //  Private Helper Functions
+    // ──────────────────────────────────────────────
+
+    private function sync_task_labels( int $task_id, array $label_ids, int $user_id, string $now ) {
+        $db         = es_scrum_db();
+        $join_table = es_scrum_table_name( 'task_labels' );
+
+        // Wipe existing relations for this task
+        $db->delete( $join_table, array( 'task_id' => $task_id ), array( '%d' ) );
+
+        foreach ( $label_ids as $label_id ) {
+            $inserted = $db->insert(
+                $join_table,
+                array(
+                    'task_id'    => $task_id,
+                    'label_id'   => intval( $label_id ),
+                    'created_by' => $user_id,
+                    'created_at' => $now,
+                ),
+                array( '%d', '%d', '%d', '%s' )
+            );
+
+            if ( false === $inserted ) {
+                return EcoServants_API_Response::error(
+                    'db_error',
+                    sprintf( 'Could not assign label ID %d to task', $label_id ),
+                    500
+                );
+            }
+        }
+
+        return true;
+    }
+
+    private function get_task_with_labels( int $task_id ) {
+        $db         = es_scrum_db();
+        $table      = es_scrum_table_name( 'tasks' );
+        $lbl_table  = es_scrum_table_name( 'labels' );
+        $join_table = es_scrum_table_name( 'task_labels' );
+
+        $sql = $db->prepare(
+            "SELECT t.*,
+                GROUP_CONCAT(
+                    CONCAT(l.id, ':', l.name, ':', COALESCE(l.color, ''))
+                    SEPARATOR '|'
+                ) AS labels
+            FROM {$table} t
+            LEFT JOIN {$join_table} tl ON tl.task_id = t.id
+            LEFT JOIN {$lbl_table}  l  ON l.id = tl.label_id
+            WHERE t.id = %d
+            GROUP BY t.id",
+            $task_id
+        );
+
+        $task = $db->get_row( $sql );
+
+        if ( ! $task ) {
+            return null;
+        }
+
+        // Parse the pipe-delimited labels string into a structured array
+        if ( empty( $task->labels ) ) {
+            $task->labels = array();
+        } else {
+            $parsed = array();
+
+            foreach ( explode( '|', $task->labels ) as $label ) {
+                $parts = explode( ':', $label );
+
+                if ( count( $parts ) !== 3 ) {
+                    continue;
+                }
+
+                list( $id, $name, $color ) = $parts;
+
+                $parsed[] = array(
+                    'id'    => (int) $id,
+                    'name'  => $name,
+                    'color' => $color,
+                );
+            }
+
+            $task->labels = $parsed;
+        }
+
+        return $task;
+    }
+
     // ──────────────────────────────────────────────
     //  GET /tasks — List tasks with pagination & filters
     // ──────────────────────────────────────────────
@@ -305,6 +395,10 @@ class EcoServants_Scrum_Board_API extends WP_REST_Controller {
             $check = EcoServants_API_Security::validate_enum( $params['type'], EcoServants_API_Security::task_types(), 'type' );
             if ( is_wp_error( $check ) ) return $check;
         }
+        // Validate labels if provided
+        if ( isset( $params['labels'] ) && ! is_array( $params['labels'] ) ) {
+            return EcoServants_API_Response::error( 'invalid_labels', 'Labels must be an array of label IDs', 400 );
+        }
 
         $db    = es_scrum_db();
         $table = es_scrum_table_name( 'tasks' );
@@ -347,11 +441,17 @@ class EcoServants_Scrum_Board_API extends WP_REST_Controller {
 
         $new_id = $db->insert_id;
 
+        // Bulk assign labels if provided
+        if ( ! empty( $params['labels'] ) ) {
+            $label_error = $this->sync_task_labels( $new_id, $params['labels'], $user_id, $now );
+            if ( is_wp_error( $label_error ) ) return $label_error;
+        }
+
         // Log activity
         es_scrum_log_activity( $new_id, $user_id, 'created', '', $data['status'] );
 
         // Return the full record from DB
-        $task = $db->get_row( $db->prepare( "SELECT * FROM {$table} WHERE id = %d", $new_id ) );
+        $task = $this->get_task_with_labels( $new_id );
 
         return EcoServants_API_Response::success( $task, 201 );
     }
@@ -374,6 +474,11 @@ class EcoServants_Scrum_Board_API extends WP_REST_Controller {
         $params = $request->get_json_params();
         if ( empty( $params ) ) {
             return EcoServants_API_Response::error( 'no_data', 'No update data provided' );
+        }
+
+        // Validate labels if provided
+        if ( isset( $params['labels'] ) && ! is_array( $params['labels'] ) ) {
+            return EcoServants_API_Response::error( 'invalid_labels', 'Labels must be an array of label IDs', 400 );
         }
 
         // Validate enum fields if present
@@ -419,17 +524,26 @@ class EcoServants_Scrum_Board_API extends WP_REST_Controller {
             }
         }
 
-        if ( empty( $update_data ) ) {
+        if ( empty( $update_data ) && ! isset( $params['labels'] ) ) {
             return EcoServants_API_Response::error( 'no_valid_fields', 'No valid fields to update' );
         }
 
         // Always update the timestamp
-        $update_data['updated_at'] = current_time( 'mysql', 1 );
+        $now = current_time( 'mysql', 1 );
+        $update_data['updated_at'] = $now;
 
-        $updated = $db->update( $table, $update_data, array( 'id' => $id ) );
+        
+        if ( ! empty( $update_data ) ) {
+            $updated = $db->update( $table, $update_data, array( 'id' => $id ) );
+            if ( false === $updated ) {
+                return EcoServants_API_Response::error( 'db_error', 'Could not update task', 500 );
+            }
+        }
 
-        if ( false === $updated ) {
-            return EcoServants_API_Response::error( 'db_error', 'Could not update task', 500 );
+        // Sync labels if provided (empty array clears all labels)
+        if ( isset( $params['labels'] ) ) {
+            $label_error = $this->sync_task_labels( $id, $params['labels'], get_current_user_id(), $now );
+            if ( is_wp_error( $label_error ) ) return $label_error;
         }
 
         // Log status change if applicable
@@ -438,7 +552,7 @@ class EcoServants_Scrum_Board_API extends WP_REST_Controller {
         }
 
         // Return the updated record
-        $task = $db->get_row( $db->prepare( "SELECT * FROM {$table} WHERE id = %d", $id ) );
+        $task = $this->get_task_with_labels( $id );
 
         return rest_ensure_response( $task );
     }
@@ -465,6 +579,10 @@ class EcoServants_Scrum_Board_API extends WP_REST_Controller {
         // Cascade delete: remove associated activity log entries
         $activity_table = es_scrum_table_name( 'activity_log' );
         $db->delete( $activity_table, array( 'task_id' => $id ), array( '%d' ) );
+
+        // Cascade delete: remove task label relations
+        $task_labels_table = es_scrum_table_name( 'task_labels' );
+        $db->delete( $task_labels_table, array( 'task_id' => $id ), array( '%d' ) );
 
         // Delete the task itself
         $deleted = $db->delete( $table, array( 'id' => $id ), array( '%d' ) );

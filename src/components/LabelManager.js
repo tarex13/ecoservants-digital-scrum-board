@@ -1,16 +1,8 @@
 import { useState, useEffect, useCallback } from '@wordpress/element';
 import apiFetch from '@wordpress/api-fetch';
-import { Button, TextControl, TextareaControl, Spinner, } from '@wordpress/components';
+import { Button, TextControl, TextareaControl, Spinner, ColorPicker, } from '@wordpress/components';
 import { Icon, pencil, cancelCircleFilled, trash, check } from '@wordpress/icons';
 import { __ } from '@wordpress/i18n';
-import SprintAnalytics from './SprintAnalytics';
-
-const STATUS_LABELS = {
-    planned: { label: 'Planned', color: '#2271b1' },
-    active: { label: 'Active', color: '#00a32a' },
-    completed: { label: 'Completed', color: '#757575' },
-    archived: { label: 'Archived', color: '#b32d2e' },
-};
 
 const LabelManager = ({ isOpen, onClose, onLabelChange }) => {
     const [sprints, setSprints] = useState([]);
@@ -23,12 +15,9 @@ const LabelManager = ({ isOpen, onClose, onLabelChange }) => {
     // Form state
     const [formData, setFormData] = useState({
         name: '',
-        desc: '',
+        description: '',
         color: '',
     });
-
-    // Analytics
-    const [analyticsId, setAnalyticsId] = useState(null);
 
     const fetchLabels = useCallback(() => {
         setIsLoading(true);
@@ -36,7 +25,6 @@ const LabelManager = ({ isOpen, onClose, onLabelChange }) => {
             .then((data) => {
                 setLabels(data);
                 setIsLoading(false);
-                console.log(data);
             })
             .catch((err) => {
                 console.error('Failed to fetch labels:', err);
@@ -58,9 +46,20 @@ const LabelManager = ({ isOpen, onClose, onLabelChange }) => {
     }, [isOpen, fetchLabels]);
 
     const resetForm = () => {
-        setFormData({ name: '', desc: '', color: '' });
+        setFormData({ name: '', description: '', color: '' });
         setEditingId(null);
         setShowForm(false);
+    };
+
+    
+    const handleEditSave = async (labelId, formData) => {
+        if (!formData.name.trim()) return;
+        const data = apiFetch({ path: `/es-scrum/v1/labels/${labelId}`, method: 'PUT', data: formData })
+            .then(() => {
+                fetchLabels();
+                if (onLabelChange) onLabelChange();
+            })
+            .catch((err) => console.error('Edit failed:', err));
     };
 
     const handleSave = () => {
@@ -79,32 +78,9 @@ const LabelManager = ({ isOpen, onClose, onLabelChange }) => {
             .finally(() => setSaving(false));
     };
 
-    const handleEdit = (sprint) => {
-        setFormData({
-            name: sprint.name,
-            start_date: sprint.start_date ? sprint.start_date.split(' ')[0] : '',
-            end_date: sprint.end_date ? sprint.end_date.split(' ')[0] : '',
-            goal: sprint.goal || '',
-            status: sprint.status,
-        });
-        setEditingId(sprint.id);
-        setShowForm(true);
-        setAnalyticsId(null);
-    };
-
-    const handleArchive = (sprint) => {
-        if (!window.confirm(`Archive "${sprint.name}"? Tasks will be unassigned from this sprint.`)) return;
-        apiFetch({ path: `/es-scrum/v1/sprints/${sprint.id}`, method: 'PATCH', data: { status: 'archived' } })
-            .then(() => {
-                fetchLabels();
-                if (onLabelChange) onLabelChange();
-            })
-            .catch((err) => console.error('Archive failed:', err));
-    };
-
-    const handleDelete = (sprint) => {
-        if (!window.confirm(`Permanently delete "${sprint.name}"? This cannot be undone.`)) return;
-        apiFetch({ path: `/es-scrum/v1/sprints/${sprint.id}`, method: 'DELETE' })
+    const handleLabelDelete = (labelId) => {
+        if (!window.confirm(`Permanently delete label? This cannot be undone.`)) return;
+        apiFetch({ path: `/es-scrum/v1/labels/${labelId}`, method: 'DELETE' })
             .then(() => {
                 fetchLabels();
                 if (onLabelChange) onLabelChange();
@@ -126,20 +102,20 @@ const LabelManager = ({ isOpen, onClose, onLabelChange }) => {
                 {/* Create / Edit Form */}
                 {showForm ? (
                     <div style={styles.form}>
-                        <h3 style={{ marginTop: 0 }}>{editingId ? 'Edit Label' : 'New Label'}</h3>
+                        <h3 style={{ marginTop: 0 }}>{editingId ? __('Edit Label', 'es-scrum') : __('New Label', 'es-scrum')}</h3>
                         <TextControl
                             label="Label Name"
                             value={formData.name}
                             onChange={(val) => setFormData({ ...formData, name: val })}
-                            placeholder="Label Name"
+                            placeholder={__("Label Name", 'es-scrum')}
                         />
                         <TextControl
                             label="Label Description"
-                            value={formData.desc}
-                            onChange={(val) => setFormData({ ...formData, desc: val })}
-                            placeholder="Label Description"
+                            value={formData.description}
+                            onChange={(val) => setFormData({ ...formData, description: val })}
+                            placeholder={__("Label Description", 'es-scrum')}
                         />
-                        <label style={styles.label}>Label Color</label>
+                        <label style={styles.label}>{__('Label Color', 'es-scrum')}</label>
                         <div style={{ display: 'flex', gap: '12px', marginBottom: '10px' }}>
                             <div style={{ flex: 1 }}>
                                 <input
@@ -152,7 +128,8 @@ const LabelManager = ({ isOpen, onClose, onLabelChange }) => {
                             <div style={{ flex: 3 }}>
                                 <input
                                     type="text"
-                                    value={formData.color}
+                                    value={formData.color} 
+                                    placeholder={__('Enter Color', 'es-scrum')}
                                     onChange={(e) => setFormData({ ...formData, color: e.target.value })}
                                     style={styles.label}
                                 />
@@ -160,9 +137,9 @@ const LabelManager = ({ isOpen, onClose, onLabelChange }) => {
                         </div>
                         <div style={{ display: 'flex', gap: '8px' }}>
                             <Button variant="primary" onClick={handleSave} isBusy={saving} disabled={saving}>
-                                Create
+                                {__("Create", 'es-scrum')}
                             </Button>
-                            <Button variant="tertiary" onClick={resetForm}>Cancel</Button>
+                            <Button variant="tertiary" onClick={resetForm}>{__("Cancel", 'es-scrum')}</Button>
                         </div>
                     </div>
                 ) : (
@@ -171,7 +148,7 @@ const LabelManager = ({ isOpen, onClose, onLabelChange }) => {
                         onClick={() => { setShowForm(true); }}
                         style={{ margin: '16px' }}
                     >
-                        + New Label
+                        + {__("New Label", 'es-scrum')}
                     </Button>
                 )}
 
@@ -183,12 +160,14 @@ const LabelManager = ({ isOpen, onClose, onLabelChange }) => {
                     ) : (
                         <>
                             {labels.length === 0 && (
-                                <p style={styles.empty}>No Lables yet. Create one to get started.</p>
+                                <p style={styles.empty}>{__("No Lables yet. Create one to get started.", 'es-scrum')}</p>
                             )}
                             <div style={{display: 'flex', gap: '4px', flexDirection: 'column', paddingLeft: '13px', alignItems: 'center'}}>
                                 {labels.map((label) => (
                                     <LabelCard 
                                         label={label}
+                                        handleEditSave={handleEditSave}
+                                        handleLabelDelete={handleLabelDelete}
                                     />
                                 ))}
                             </div>
@@ -200,43 +179,52 @@ const LabelManager = ({ isOpen, onClose, onLabelChange }) => {
     );
 };
 
-const LabelCard = ({ label }) => {
-    const [labelName, setLabelName] = useState(label.name);
-    const [labelDesc, setLabelDesc] = useState(label.desc || "Task Description");
-    const [labelColor, setLabelColor] = useState(label.color);
+const LabelCard = ({ label, handleLabelDelete, handleEditSave }) => {
+    const [formData, setFormData] = useState({
+        name: label.name,
+        description: label.description,
+        color: label.color,
+    });
+    
+    const resetForm = () => {
+        setFormData({ name: '', description: '', color: '' });
+        setEditingLabel(false);
+    };
     const [editingLabel, setEditingLabel] = useState(false);
 
-
-
-    const handleEdit = () => {
-        setEditingLabel(false);
-    }
-
-    const handleLabelDelete = () => {
-        return null;
-    }
     return (
         <>
         {!editingLabel ? 
             <div style={{width: '100%', padding: '16px 3px',  boxShadow: '4px 3px 10px 0px rgba(0,0,0,0.05)', borderLeft: `4px solid ${label.color}`, margin: '5px', display: 'flex', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'}}>
-                <label key={label.id} style={{ padding: '2px 6px', fontSize: 'medium', borderLeft: '3px solid ' + label.color, color: label.color, borderRadius: '5px', }}>{label.name}</label>
-                <label>This is the description for this task</label>
-                <div style={{display: 'flex', gap: '4px'}}>
+                <span key={label.id} style={{ padding: '2px 6px', fontSize: 'medium', borderLeft: '3px solid ' + label.color, color: label.color, borderRadius: '5px', }}>{label.name}</span>
+                <span>{label.description}</span>
+                <div style={{display: 'flex', gap: '4px', paddingRight: '5px'}}>
                     <div><Icon icon={pencil} style={{cursor: 'pointer'}} onClick={()=>setEditingLabel(true)} /></div>
-                    <div><Icon icon={trash} style={{cursor: 'pointer'}} /></div>
+                    <div><Icon icon={trash} style={{cursor: 'pointer'}} onClick={()=>{setEditingLabel(false);handleLabelDelete(label.id);}} /></div>
                 </div>
             </div>
             :
             <div style={{width: '100%', padding: '16px 3px',  boxShadow: '4px 3px 10px 0px rgba(0,0,0,0.05)', borderLeft: `4px solid ${label.color}`, margin: '5px', display: 'flex', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'}}>
                 <div style={{display: 'flex', flexDirection: 'column', gap: '8px', width: '80%'}}>
-                    <input value={labelName} onChange={(e)=>{setLabelName(e.target.value)}} style={{ padding: '2px 6px', fontSize: 'medium', borderLeft: '3px solid ' + label.color, color: label.color, borderRadius: '5px', outline: 'none', marginBottom: '5px' }} placeholder='Enter Label Name' />
-                    <input value={labelDesc} onChange={(e)=>{setLabelDesc(e.target.value)}} style={{ padding: '2px 6px', fontSize: 'medium', borderLeft: '3px solid ' + label.color, color: label.color, borderRadius: '5px', outline: 'none' }} placeholder='Enter Label Description' />
-                    <input type='color' value={labelColor.length == 7 ? labelColor : '#ffffff' } onChange={(e)=>{setLabelColor(e.target.value)}} style={{width: '100%'}} />
-                    <input value={labelColor} onInput={(e)=>{setLabelColor(e.target.value)}} style={{width: '100%'}} placeholder='Enter Color' />
+                    <TextControl
+                        label={__("Label Name", 'es-scrum')}
+                        value={formData.name}
+                        onChange={(val)=>{setFormData(state => {return {...state, name: val}})}}
+                        placeholder={__("Label Name", 'es-scrum')}
+                    />
+                    <TextControl
+                        label={__("Label Description", 'es-scrum')}
+                        value={formData.description}
+                        onChange={(val)=>{setFormData(state => {return {...state, description: val}})}}
+                        placeholder={__("Enter Label Description", 'es-scrum')}
+                    />
+                    <label style={styles.label}>{__("Choose Color", 'es-scrum')}</label>
+                    <input type='color' value={formData.color.length == 7 ? formData.color : '#ffffff' } onChange={(e)=>{setFormData(state => {return {...state, color: e.target.value}})}} style={{width: '100%'}} />
+                    <input value={formData.color} onInput={(e)=>{setFormData(state => {return {...state, color: e.target.value}})}} style={{width: '100%'}} placeholder={__('Enter Color', 'es-scrum')} />
                 </div>
-                <div style={{display: 'flex', padding: '10px'}}>
-                    <div style={{display: 'flex', gap: '4px', cursor: 'pointer'}}><Icon icon={trash} onClick={()=>setEditingLabel(false)} /></div>
-                    <div style={{display: 'flex', gap: '4px', cursor: 'pointer'}}><Icon icon={check} onClick={handleEdit} /></div>
+                <div style={{display: 'flex', padding: '10px', alignItems: 'center'}}>
+                    <div style={{display: 'flex', cursor: 'pointer'}} onClick={()=>{resetForm()}}><Button style={{fontSize: '16px', padding: '2px'}} >X</Button></div>
+                    <div style={{display: 'flex', cursor: 'pointer'}}><Button icon={check} style={{padding: '2px'}} onClick={()=>{handleEditSave(label.id, formData)}} /></div>
                 </div>
             </div>
         }

@@ -2,8 +2,9 @@ import { useState, useEffect } from '@wordpress/element';
 import { Modal, Button, TextControl, TextareaControl, SelectControl, Spinner } from '@wordpress/components';
 import { __ } from '@wordpress/i18n';
 import apiFetch from '@wordpress/api-fetch';
-import { MediaUpload, MediaUploadCheck } from '@wordpress/media-utils';
+import { MediaUpload, MediaUploadCheck } from '@wordpress/block-editor';
 import CommentThread from './CommentThread';
+import LabelFilter from './LabelFilter';
 
 const STATUS_OPTIONS = [
     { label: __('Backlog', 'es-scrum'), value: 'backlog' },
@@ -31,6 +32,7 @@ const TaskModal = ({ task, onClose, onSave, onDelete }) => {
     const [title, setTitle] = useState(task?.title || '');
     const [description, setDescription] = useState(task?.description || '');
     const [status, setStatus] = useState(task?.status || 'backlog');
+    const [selectedLabels, setSelectedLabels] = useState(task?.labels?.map((l)=> l.id) || []);
     const [priority, setPriority] = useState(task?.priority || 'medium');
     const [type, setType] = useState(task?.type || 'task');
     const [storyPoints, setStoryPoints] = useState(task?.story_points || '');
@@ -80,6 +82,7 @@ const TaskModal = ({ task, onClose, onSave, onDelete }) => {
             program_slug: programSlug || null,
             assignee_id: assigneeId ? parseInt(assigneeId, 10) : null,
             attachments: attachments.length > 0 ? JSON.stringify(attachments) : null,
+            labels: selectedLabels,
         };
 
         const path = isNew ? '/es-scrum/v1/tasks' : `/es-scrum/v1/tasks/${task.id}`;
@@ -146,6 +149,12 @@ const TaskModal = ({ task, onClose, onSave, onDelete }) => {
         >
             {error && <div className="notice notice-error"><p>{error}</p></div>}
             
+            <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap', paddingBottom: '10px' }}>
+                        {task?.labels?.map(({ name, color }, index) => (
+                            <label key={index} style={{ padding: '2px 6px', fontSize: 'x-small', borderLeft: '3px solid ' + color, borderTop: '1px solid ' + color, borderBottom: '1px solid ' + color, borderRight: '1px solid ' + color, color, boxShadow: '4px 3px 10px 0px rgba(0,0,0,0.05)', borderRadius: '5px', }}>{name}</label>
+                        ))}
+            </div>
+
             <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
                 <div style={{ flex: '2', minWidth: '300px' }}>
                     <TextControl
@@ -189,14 +198,6 @@ const TaskModal = ({ task, onClose, onSave, onDelete }) => {
                             />
                         </MediaUploadCheck>
                     </div>
-
-                                <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap', paddingTop: '4px', paddingBottom: '10px' }}>
-                        {task?.labels?.map(({ name, color }, index) => (
-                            <label key={index} style={{ padding: '2px 6px', fontSize: 'x-small', borderLeft: '3px solid ' + color, borderTop: '1px solid ' + color, borderBottom: '1px solid ' + color, borderRight: '1px solid ' + color, color, boxShadow: '4px 3px 10px 0px rgba(0,0,0,0.05)', borderRadius: '5px', }}>{name}</label>
-                            
-
-                        ))}
-            </div>
 
                     {!isNew && (
                         <div style={{ marginTop: '24px' }}>
@@ -250,6 +251,7 @@ const TaskModal = ({ task, onClose, onSave, onDelete }) => {
                         value={dueDate}
                         onChange={setDueDate}
                     />
+                    <LabelFilter selectedLabels={selectedLabels} setSelectedLabels={setSelectedLabels} inNewForm={true} />
                 </div>
             </div>
 
