@@ -2,7 +2,7 @@ import { useState, useEffect } from '@wordpress/element';
 import { Modal, Button, TextControl, TextareaControl, SelectControl, Spinner } from '@wordpress/components';
 import { __ } from '@wordpress/i18n';
 import apiFetch from '@wordpress/api-fetch';
-import { MediaUpload, MediaUploadCheck } from '@wordpress/media-utils';
+import { MediaUpload, MediaUploadCheck } from '@wordpress/block-editor';
 import CommentThread from './CommentThread';
 
 const STATUS_OPTIONS = [

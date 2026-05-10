@@ -338,7 +338,7 @@ class EcoServants_Sprint_API extends WP_REST_Controller {
     //  PATCH /sprints/{id} — Update a sprint
     // ──────────────────────────────────────────────
 
-    public function update_item( $request ) {
+    public function update_item_( $request ) {
         $db    = es_scrum_db();
         $table = es_scrum_table_name( 'sprints' );
         $id    = absint( $request->get_param( 'id' ) );

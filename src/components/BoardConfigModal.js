@@ -1,8 +1,8 @@
 import { useState, useEffect } from '@wordpress/element';
-import { Modal, Button, TextControl, SelectControl, ColorPalette, PanelBody, PanelRow } from '@wordpress/components';
+import { Modal, Button, TextControl, SelectControl, ColorPalette, PanelBody, PanelRow, FormToggle } from '@wordpress/components';
 import { __ } from '@wordpress/i18n';
 
-const BoardConfigModal = ({ isOpen, onClose, config, onSave }) => {
+const BoardConfigModal = ({ isOpen, onClose, config, onSave, openShortcutsMenu }) => {
     const [localConfig, setLocalConfig] = useState(config);
 
     useEffect(() => {
@@ -41,6 +41,7 @@ const BoardConfigModal = ({ isOpen, onClose, config, onSave }) => {
         onSave(localConfig);
         onClose();
     };
+    
 
     return (
         <Modal title={__('Board Settings', 'es-scrum')} onRequestClose={onClose}>
@@ -84,6 +85,20 @@ const BoardConfigModal = ({ isOpen, onClose, config, onSave }) => {
                 ))}
                 <p style={{ fontSize: '11px', color: '#666' }}>* Task type adding not fully implemented in UI demo</p>
             </PanelBody>
+
+            <PanelBody title={__('Keyboard Shortcuts', 'es-scrum')} initialOpen={false}>
+                <div style={{display: 'flex', justifyContent: 'space-between'}}>  
+                    <span>{__('Use keyboard shortcuts', 'es-scrum')}</span>
+                    <FormToggle
+                        checked={ localConfig.useKeyboardShortcuts }
+                        onChange={ (e) => setLocalConfig(s =>  ({...s, useKeyboardShortcuts: !s.useKeyboardShortcuts}) )} 
+                    />
+                </div>
+                <div style={{display: 'flex', justifyContent: 'flex-end'}}>
+                    <Button isTertiary onClick={openShortcutsMenu}>{__('View Shortcuts Menu', 'es-scrum')}</Button>
+                </div>
+            </PanelBody>
+
 
             <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
                 <Button isSecondary onClick={onClose}>{__('Cancel', 'es-scrum')}</Button>

@@ -12,5 +12,6 @@ export const defaultConfig = {
         { id: 'bug', label: 'Bug', color: '#cf2e2e' },
         { id: 'story', label: 'Story', color: '#00a32a' }
     ],
-    theme: 'light'
+    theme: 'light',
+    useKeyboardShortcuts: true
 };

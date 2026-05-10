@@ -9,6 +9,8 @@ import UserProfileModal from './UserProfileModal';
 import { defaultConfig } from '../utils/defaultConfig';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import TaskModal from './TaskModal';
+import ShortcutsInfoModal from './ShortcutsInfoModal';
+import TaskQuickAssign from './TaskQuickAssign';
 
 const COLUMNS = {
     backlog: { label: 'Backlog', color: '#ddd' },
@@ -31,7 +33,11 @@ const ScrumBoard = () => {
     const [error, setError] = useState(null);
     const [selectedSprintId, setSelectedSprintId] = useState(null);
     const [sprintManagerOpen, setSprintManagerOpen] = useState(false);
-    const [refreshKey, setRefreshKey] = useState(0);
+    const [refreshKey, setRefreshKey] = useState(0);    
+    const [shortcutsModalOpen, setShortcutsModalOpen] = useState(false);
+    const [showTaskQuickAssign, setShowTaskQuickAssign] = useState(false);
+    const [keyboardSelectedColumn, setKeyboardSelectedColumn] = useState(null);
+    const [keyboardSelectedTaskId, setKeyboardSelectedTaskId] = useState(null);
 
     // Task detail modal — store ID, derive task from live array
     const [selectedTaskId, setSelectedTaskId] = useState(null);
@@ -73,6 +79,18 @@ const ScrumBoard = () => {
             if (userData) setCurrentUserId(userData.id);
         });
     }, []);
+    useEffect(()=>{
+        let viewed = window.localStorage.getItem("shortcutsInfoViewed");
+        if(viewed){
+            return;
+        }
+        try{
+            window.localStorage.setItem("shortcutsInfoViewed", true);
+        }catch(err){
+            console.log(err.message);
+        }
+        openShortcutsInfoModal();
+    }, [])
 
     useEffect(() => {
         fetchTasks();
@@ -94,6 +112,14 @@ const ScrumBoard = () => {
     const closeModal = useCallback(() => {
         setSelectedTaskId(null);
     }, []);
+
+    const openShortcutsInfoModal = () => {
+        setShortcutsModalOpen(true);
+    }
+
+    const closeShortcutsInfoModal = () => {
+        setShortcutsModalOpen(false);
+    }
 
     const handleProfileClick = useCallback((userId) => {
         setProfileUserId(userId);
@@ -148,6 +174,22 @@ const ScrumBoard = () => {
             });
     };
 
+    const quickAssign = (taskId, assigneeId) => {
+        const taskData = {
+            assignee_id: assigneeId ? parseInt(assigneeId, 10) : null
+        };
+
+        const path = `/es-scrum/v1/tasks/${taskId}`;
+
+        apiFetch({ path, method: 'PATCH', data: taskData })
+            .then((savedTask) => {
+                setShowTaskQuickAssign(false);
+            })
+            .catch((err) => {
+                console.error(err);
+            });
+    }
+
     if (error) {
         return <div className="notice notice-error"><p>{error}</p></div>;
     }
@@ -168,6 +210,91 @@ const ScrumBoard = () => {
     const selectedTask = selectedTaskId
         ? tasks.find((t) => t.id === selectedTaskId) || null
         : null;
+
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            // ignore when typing in editable fields
+            const tag = e.target?.tagName;
+            const columnsArray = Object.entries(columns);
+            const isEditable =
+                tag === 'INPUT' || tag === 'TEXTAREA' || e.target?.isContentEditable;
+            if (isEditable) return;
+            if(!config.useKeyboardShortcuts) return;
+            if(e.key == '/'){
+                //! Implementation for the task search 
+                // This is currently being implemented by @toofancodes
+            }else if(e.key == 'N' || e.key == 'n'){
+                setIsCreatingTask(true);
+            }else if(e.key == 'A' || e.key == 'a'){
+                // Implementation for the quick task assign
+                if(keyboardSelectedTaskId != null){
+                    setShowTaskQuickAssign(true);
+                }
+            }else if(e.key == 'ArrowRight'){
+                    // If no current selected column start from the first one
+                if(keyboardSelectedColumn == null){
+                    setKeyboardSelectedColumn(0);
+                }else{
+                    setKeyboardSelectedColumn(s => ((s + 1) % Object.entries(COLUMNS).length))
+                }
+                // Implementation for selecting a column
+            }else if(e.key == 'ArrowLeft'){
+                if(keyboardSelectedColumn == null){
+                    // If no current selected column start from the first one
+                    setKeyboardSelectedColumn(0);
+                    //  safeguard against negative numbers
+                }else if(keyboardSelectedColumn == 0){
+                    setKeyboardSelectedColumn(Object.entries(COLUMNS).length - 1);
+                }else{
+                    setKeyboardSelectedColumn(s => ((s - 1) % Object.entries(COLUMNS).length))
+                }
+                // Implementation for selecting a column
+            }else if(e.key == 'ArrowUp'){
+                if(keyboardSelectedColumn == null){
+                    // Set the first column as the selected column
+                    setKeyboardSelectedColumn(0);
+                    // set the first task in the first column as the selected task
+                    setKeyboardSelectedTaskId(columnsArray[0][1][0]?.id);
+                // if user is already at the top most task
+                }else if(keyboardSelectedTaskId == columnsArray[keyboardSelectedColumn][1][0].id){
+                    // then set the selected task id to the bottom most task to achieve an infiinte scroll loop
+                    setKeyboardSelectedTaskId(columnsArray[keyboardSelectedColumn][1][columnsArray[keyboardSelectedColumn][1].length - 1]?.id);
+                }else{
+                    // else just find the set selected task to task above current selected task
+                    setKeyboardSelectedTaskId(columnsArray[keyboardSelectedColumn][1][columnsArray[keyboardSelectedColumn][1].findIndex(el=>el.id == keyboardSelectedTaskId) - 1]?.id);
+                }
+                // Implementation for selecting a column
+            }else if(e.key == 'ArrowDown'){
+                if(keyboardSelectedColumn == null){
+                    // Set the first column as the selected column
+                    setKeyboardSelectedColumn(0);
+                    // set the last task in the first column as the selected task
+                    setKeyboardSelectedTaskId(columnsArray[0][1][columnsArray[0][1].length - 1]?.id);
+                // if user is already at the bottom most task
+                }else if(keyboardSelectedTaskId == columnsArray[keyboardSelectedColumn][1][columnsArray[0][1].length - 1]?.id){
+                    // then set the selected task id to the top most task to achieve an infiinte scroll loop
+                    setKeyboardSelectedTaskId(columnsArray[keyboardSelectedColumn][1][0]?.id);
+                }else{
+                    // else just find the set selected task to task above current selected task
+                    setKeyboardSelectedTaskId(columnsArray[keyboardSelectedColumn][1][columnsArray[keyboardSelectedColumn][1].findIndex(el=>el.id == keyboardSelectedTaskId) + 1]?.id);
+                }
+                // Implementation for selecting a column
+            }
+            // handle keys
+            if (e.key === 'Escape') {
+                //console.log('Global: Escape pressed');
+            } else if (e.key === 'k' && (e.ctrlKey || e.metaKey)) {
+                e.preventDefault();
+                //console.log('Global: Cmd/Ctrl+K pressed');
+            } else {
+                //console.log('Global key:', e.key);
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [keyboardSelectedColumn, columns, keyboardSelectedTaskId]);
+    
 
     return (
         <div className="es-scrum-board">
@@ -214,13 +341,14 @@ const ScrumBoard = () => {
             ) : (
                 <DragDropContext onDragEnd={handleDragEnd}>
                     <div style={styles.board}>
-                        {Object.entries(COLUMNS).map(([status, meta]) => (
+                        {Object.entries(COLUMNS).map(([status, meta], colIndex) => (
                             <Droppable key={status} droppableId={status}>
                                 {(provided, snapshot) => (
                                     <div 
+                                        onClick={()=>setKeyboardSelectedColumn(colIndex)}
                                         ref={provided.innerRef} 
                                         {...provided.droppableProps}
-                                        style={{ ...styles.column, background: snapshot.isDraggingOver ? '#e3f2fd' : '#f0f0f1' }}
+                                        style={{ ...styles.column, background: snapshot.isDraggingOver ? '#e3f2fd' : '#f0f0f1', border: keyboardSelectedColumn == colIndex ? '2px solid #d0d0d0' : '' }}
                                     >
                                         <div style={{ ...styles.columnHeader, borderBottom: `3px solid ${meta.color}` }}>
                                             <span>{meta.label}</span>
@@ -237,13 +365,15 @@ const ScrumBoard = () => {
                                                             ref={provided.innerRef}
                                                             {...provided.draggableProps}
                                                             {...provided.dragHandleProps}
+                                                            onClick={()=>{setKeyboardSelectedTaskId(task.id)}}
                                                             style={{
                                                                 ...provided.draggableProps.style,
-                                                                opacity: snapshot.isDragging ? 0.8 : 1,
+                                                                opacity: snapshot.isDragging ? 0.8 : 1
                                                             }}
                                                         >
                                                             <TaskCard
                                                                 task={task}
+                                                                keyboardSelected={keyboardSelectedTaskId == task.id && colIndex == keyboardSelectedColumn}
                                                                 onViewDetails={openModal}
                                                                 onProfileClick={handleProfileClick}
                                                             />
@@ -294,12 +424,30 @@ const ScrumBoard = () => {
                 />
             )}
 
+            {shortcutsModalOpen && 
+                <ShortcutsInfoModal
+                    onClose={()=>setShortcutsModalOpen(false)}
+                    config={config}
+                    onSave={saveConfig}
+                />
+            }
+
+            {showTaskQuickAssign &&
+                <TaskQuickAssign 
+                    onClose={()=>setShowTaskQuickAssign(false)}
+                    taskId={keyboardSelectedTaskId}
+                    onSave={quickAssign}
+                    tasks={tasks}
+                />
+            }
+
             {/* Board Config Modal */}
             <BoardConfigModal
                 isOpen={isConfigOpen}
                 onClose={() => setIsConfigOpen(false)}
                 config={config}
                 onSave={saveConfig}
+                openShortcutsMenu={()=>setShortcutsModalOpen(true)}
             />
 
             {/* User Profile Modal */}
@@ -312,9 +460,9 @@ const ScrumBoard = () => {
     );
 };
 
-const TaskCard = memo(({ task, onViewDetails, onProfileClick }) => {
+const TaskCard = memo(({ task, onViewDetails, onProfileClick, keyboardSelected }) => {
     return (
-        <Card size="small" style={styles.card}>
+        <Card size="small" style={{...styles.card, border: keyboardSelected ? '3px solid #ddd' : '1px solid #d0d0d0'}}>
             <CardHeader style={{ padding: '8px 12px' }}>
                 <div style={{ flex: 1 }}>
                     <strong style={{ fontSize: '13px' }}>{task.title}</strong>
@@ -416,7 +564,6 @@ const styles = {
     },
     card: {
         marginBottom: '8px',
-        border: '1px solid #ddd',
         background: '#fff',
     },
     description: {
